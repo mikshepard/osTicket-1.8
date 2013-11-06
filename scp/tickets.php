@@ -463,14 +463,6 @@ if($_POST && !$errors):
                 if ($topic=Topic::lookup($_POST['topicId'])) {
                     if ($form = DynamicForm::lookup($topic->ht['form_id'])) {
                         $form = $form->instanciate();
-                        # Collect name, email, and subject address for banning and such
-                        foreach ($form->getAnswers() as $answer) {
-                            $fname = $answer->getField()->get('name');
-                            if (in_array($fname, $interest))
-                                # XXX: Assigning to _POST not considered great PHP
-                                #      coding style
-                                $_POST[$fname] = $answer->getField()->getClean();
-                        }
                         if (!$form->isValid())
                             $errors = array_merge($errors, $form->errors());
                     }
