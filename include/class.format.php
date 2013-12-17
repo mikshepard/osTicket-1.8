@@ -249,13 +249,33 @@ class Format {
     }
 
     function htmlencode($var) {
-        $flags = ENT_COMPAT | ENT_QUOTES;
+        $flags = ENT_QUOTES;
         if (phpversion() >= '5.4.0')
-            $flags |= ENT_HTML401;
+            $flags |= ENT_HTML401 | ENT_SUBSTITUTE;
+        else
+            // <sililoquy>
+            // Some mail clients may advertise that the mail body is UTF-8
+            // encoded, when, in reality, it is ISO-8859-1 encoded. Since it
+            // is difficult to detect this in ::encode(), $var may still be
+            // incorrectly encoded. In other words, htmlentities() may very
+            // well find incorrect UTF-8 characters in the received text. The
+            // default policy of htmlentities() is to drop the entire text.
+            //
+            // One possible answer would be to detect the deleted text and
+            // try and forcably transcode from ISO-8859-1 to UTF-8 and try
+            // again, which will fix that one issue; however, for now it
+            // would be best to just drop the (seemingly) incorrectly encoded
+            // characters. Blindly guessing the encoding could have even
+            // worse side effects.
+            //
+            // PHP advertises that ENT_IGNORE introduces a possible security
+            // issue; however, we are generally relying on htmLawed to scrub
+            // HTML texts more thoroughly
+            $flags |= ENT_IGNORE;
 
         return is_array($var)
             ? array_map(array('Format','htmlencode'), $var)
-            : htmlentities($var, $flags, 'UTF-8');
+            : htmlentities($var, $flags, 'UTF-8', false);
     }
 
     function htmldecode($var) {
