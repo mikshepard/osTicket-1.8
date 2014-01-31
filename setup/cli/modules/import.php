@@ -163,7 +163,6 @@ class Importer extends Module {
             $index['cols'][] = $col;
         }
         foreach ($indexes as $name=>$info) {
-            $cols = array();
             $this->send_statement('CREATE '
                 .(($info['unique']) ? 'UNIQUE ' : '')
                 .'INDEX `'.$name
@@ -183,7 +182,7 @@ class Importer extends Module {
             $indexes[$idx['Key_name']] =
                 '`'.TABLE_PREFIX.$info[1].'`.`'.$idx['Key_name'].'`';
         }
-        foreach ($indexes as $T=>$fqn)
+        foreach ($indexes as $fqn)
             $this->send_statement('DROP INDEX IF EXISTS '.$fqn);
     }
 

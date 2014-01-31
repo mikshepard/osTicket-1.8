@@ -640,7 +640,7 @@ class Ticket {
         //Deletes
         if($vars['del'] && ($ids=array_filter($vars['del']))) {
             $collabs = array();
-            foreach ($ids as $k => $cid) {
+            foreach ($ids as $cid) {
                 if (($c=Collaborator::lookup($cid))
                         && $c->getTicketId() == $this->getId()
                         && $c->remove())
@@ -924,7 +924,7 @@ class Ticket {
             if($cfg->alertDeptManagerONNewTicket() && $dept && ($manager=$dept->getManager()))
                 $recipients[]= $manager;
 
-            foreach( $recipients as $k=>$staff) {
+            foreach( $recipients as $staff) {
                 if(!is_object($staff) || !$staff->isAvailable() || in_array($staff->getEmail(), $sentlist)) continue;
                 $alert = $this->replaceVars($msg, array('recipient' => $staff));
                 $email->sendAlert($staff->getEmail(), $alert['subj'], $alert['body'], null, $options);
@@ -1131,7 +1131,7 @@ class Ticket {
             $options = array(
                 'inreplyto'=>$note->getEmailMessageId(),
                 'references'=>$note->getEmailReferences());
-            foreach( $recipients as $k=>$staff) {
+            foreach( $recipients as $staff) {
                 if(!is_object($staff) || !$staff->isAvailable() || in_array($staff->getEmail(), $sentlist)) continue;
                 $alert = $this->replaceVars($msg, array('recipient' => $staff));
                 $email->sendAlert($staff->getEmail(), $alert['subj'], $alert['body'], null, $options);
@@ -1180,7 +1180,7 @@ class Ticket {
                 $recipients[]= $manager;
 
             $sentlist=array();
-            foreach( $recipients as $k=>$staff) {
+            foreach( $recipients as $staff) {
                 if(!is_object($staff) || !$staff->isAvailable() || in_array($staff->getEmail(), $sentlist)) continue;
                 $alert = $this->replaceVars($msg, array('recipient' => $staff));
                 $email->sendAlert($staff->getEmail(), $alert['subj'], $alert['body'], null);
@@ -1381,7 +1381,7 @@ class Ticket {
             $options = array(
                 'inreplyto'=>$note->getEmailMessageId(),
                 'references'=>$note->getEmailReferences());
-            foreach( $recipients as $k=>$staff) {
+            foreach( $recipients as $staff) {
                 if(!is_object($staff) || !$staff->isAvailable() || in_array($staff->getEmail(), $sentlist)) continue;
                 $alert = $this->replaceVars($msg, array('recipient' => $staff));
                 $email->sendAlert($staff->getEmail(), $alert['subj'], $alert['body'], null, $options);
@@ -1586,7 +1586,7 @@ class Ticket {
                 $recipients[]=$manager;
 
             $sentlist=array(); //I know it sucks...but..it works.
-            foreach( $recipients as $k=>$staff) {
+            foreach( $recipients as $staff) {
                 if(!$staff || !$staff->getEmail() || !$staff->isAvailable() || in_array($staff->getEmail(), $sentlist)) continue;
                 $alert = $this->replaceVars($msg, array('recipient' => $staff));
                 $email->sendAlert($staff->getEmail(), $alert['subj'], $alert['body'], null, $options);
@@ -1811,7 +1811,7 @@ class Ticket {
                 'inreplyto'=>$note->getEmailMessageId(),
                 'references'=>$note->getEmailReferences());
             $sentlist=array();
-            foreach( $recipients as $k=>$staff) {
+            foreach( $recipients as $staff) {
                 if(!is_object($staff)
                         || !$staff->isAvailable() //Don't bother vacationing staff.
                         || in_array($staff->getEmail(), $sentlist) //No duplicates.

@@ -55,7 +55,7 @@ class XmlDataParser {
         }
         else if (strlen($start[":text"]) == 0) { unset($start[":text"]); }
         # Recurse
-        foreach ($start as $name => &$value) {
+        foreach ($start as &$value) {
             if (is_array($value)) $value = $this->reduce($value);
         }
         return $start;
@@ -75,7 +75,6 @@ class XmlDataParser {
         # name of the element in the parent content array.
         $prev = $this->content;
         $this->content = array_pop($this->stack);
-        $i = 1;
         if (array_key_exists($name, $this->content)) {
             if(!isset($this->content[$name][0])) {
                 $current = $this->content[$name];

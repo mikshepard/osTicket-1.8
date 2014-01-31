@@ -7,7 +7,6 @@ class UnitializedVars extends Test {
 
     function testUnitializedUsage() {
         $scripts = $this->getAllScripts();
-        $matches = array();
         foreach ($scripts as $s) {
             $a = new SourceAnalyzer($s);
             $a->parseFile();

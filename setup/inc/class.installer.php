@@ -177,7 +177,7 @@ class Installer extends SetupWizard {
                 .', lastname='.db_input($vars['lname'])
                 .', username='.db_input($vars['username'])
                 .', passwd='.db_input(Passwd::hash($vars['passwd']));
-            if(!db_query($sql, false) || !($uid=db_insert_id()))
+            if(!db_query($sql, false) || !db_insert_id())
                 $this->errors['err']='Unable to create admin user (#6)';
         }
 
@@ -258,7 +258,7 @@ class Installer extends SetupWizard {
         $errors = array();
         $ticket_vars = $i18n->getTemplate('templates/ticket/installed.yaml')
             ->getData();
-        $tid = Ticket::create($ticket_vars, $errors, 'api', false, false);
+        Ticket::create($ticket_vars, $errors, 'api', false, false);
 
         //TODO: create another personalized ticket and assign to admin??
 

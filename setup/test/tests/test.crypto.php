@@ -37,7 +37,7 @@ class TestCrypto extends Test {
 
     function _testLibrary($c, $tests) {
         $name = get_class($c);
-        foreach ($tests as $id => $subject) {
+        foreach ($tests as $subject) {
             $dec = $c->decrypt(base64_decode($subject));
             $this->assertEqual($dec, $this->test_data, "$name: decryption incorrect");
             $this->assertNotEqual($dec, false, "$name: decryption FAILED");
