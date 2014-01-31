@@ -20,6 +20,10 @@ class UnitializedVars extends Test {
                     list($line, $file) = $bug['line'];
                     $this->warn("Possible access to NULL object @ $file : $line");
                 }
+                elseif ($bug['type'] == 'DEF_UNUSED') {
+                    list($line, $file) = $bug['line'];
+                    $this->fail($file, $line, "'{$bug['name']} is unused'");
+                }
             }
             if (!$a->bugs)
                 $this->pass();

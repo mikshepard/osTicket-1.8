@@ -10,6 +10,10 @@ class SourceAnalyzer extends Test {
     var $globals = array();
     var $file = '';
 
+    const DEFINED = 1;
+    const BYREF = 2;
+    const GLOBAL_ = 4;
+
     function __construct($source) {
         $this->tokens = token_get_all(file_get_contents($source));
         $this->file = $source;
@@ -27,7 +31,7 @@ class SourceAnalyzer extends Test {
         $token = false;
         $blocks = 0;
         $func_options = array('allow_this'=>true);
-        while (list($i,$token) = each($this->tokens)) {
+        while (list(,$token) = each($this->tokens)) {
             switch ($token[0]) {
             case '{':
                 $blocks++;
@@ -80,7 +84,7 @@ class SourceAnalyzer extends Test {
                 $function['name'] = $token[1];
                 break;
             case T_VARIABLE:
-                $scope[$token[1]] = 1;
+                $scope[$token[1]] = self::DEFINED;
                 break;
             case ';':
                 // Abstract function -- no body will follow
@@ -97,6 +101,9 @@ class SourceAnalyzer extends Test {
         $options = array_merge(array(
             'allow_this' => false,
             ), $options);
+        // Keep track of things defined in this scope but not used
+        $parent_scope = $scope;
+        $used = array();
         // Unpack function[line][file] if set
         if (is_array($function['line']))
             $function['file'] = $function['line'][1];
@@ -107,8 +114,30 @@ class SourceAnalyzer extends Test {
                 $blocks++;
                 break;
             case '}':
-                if (--$blocks == 0)
+                if (--$blocks == 0) {
+                    foreach ($scope as $name => $flags) {
+                        if ($flags & (self::BYREF | self::GLOBAL_))
+                            // Variable was defined by reference in scope,
+                            // or changed a global variable which will be
+                            // accessible elsewhere
+                            continue;
+                        elseif (isset($parent_scope[$name]))
+                            // Variables from parent scope don't have to be
+                            // used in child scopes
+                            continue;
+                        elseif (!isset($used[$name]))
+                            $this->bugs[] = array(
+                                'type' => 'DEF_UNUSED',
+                                'func' => $function['name'],
+                                'line' => array(
+                                    ($function['name'] ?: 'anonymous')
+                                        . ' on ' .$function['line'][0],
+                                    $function['file']),
+                                'name' => $name,
+                            );
+                    }
                     return $scope;
+                }
                 break;
             case T_VARIABLE:
                 // Look-ahead for assignment
@@ -141,11 +170,15 @@ class SourceAnalyzer extends Test {
                 case T_SR_EQUAL:
                 case T_XOR_EQUAL:
                     $assignment = true;
-                    $scope[$token[1]] = 1;
+                    if (!isset($scope[$token[1]]))
+                        $scope[$token[1]] = self::DEFINED;
                     break;
                 }
                 if ($assignment)
                     break;
+                else
+                    // Variable used in this scope
+                    $used[$token[1]] = 1;
 
                 if (!isset($scope[$token[1]])) {
                     if ($token[1] == '$this' && $options['allow_this']) {
@@ -166,7 +199,7 @@ class SourceAnalyzer extends Test {
                         'type' => 'UNDEF_ACCESS',
                         'func' => $function['name'],
                         'line' => array($token[2], $function['file']),
-                        'name' => $token[1],
+                        'name' => $name,
                     );
                 }
                 elseif ($scope[$token[1]] == 'null') {
@@ -219,20 +252,29 @@ class SourceAnalyzer extends Test {
                     elseif (!is_array($token))
                         continue;
                     elseif ($token[0] == T_VARIABLE)
-                        $scope[$token[1]] = 1;
+                        $scope[$token[1]] = self::DEFINED | self::GLOBAL_;
                 }
                 break;
             case T_FOR:
                 // for ($i=0;...)
                 // Find first semi-colon, variables defined before it should
                 // be added to the current scope
+                $rhs = false;
                 while (list(,$token) = each($this->tokens)) {
                     if ($token == ';')
                         break;
+                    elseif ($token == ',')
+                        $rhs = false;
+                    elseif ($token == '=')
+                        $rhs = true;
                     elseif (!is_array($token))
                         continue;
-                    elseif ($token[0] == T_VARIABLE)
-                        $scope[$token[1]] = 1;
+                    elseif ($token[0] == T_VARIABLE) {
+                        if (!$rhs)
+                            $scope[$token[1]] = self::DEFINED;
+                        else
+                            $used[$token[1]] = 1;
+                    }
                 }
                 break;
             case T_FOREACH:
@@ -242,20 +284,29 @@ class SourceAnalyzer extends Test {
                 $parens = 0;
                 // Scan for the variables defined for the scope of the
                 // foreach block
+                $byref = false;
                 while (list(,$token) = each($this->tokens)) {
                     if ($token == '(')
                         $parens++;
                     elseif ($token == ')' && --$parens == 0)
                         break;
+                    elseif ($token == '&')
+                        $byref = true;
                     elseif (!is_array($token))
                         continue;
                     elseif ($token[0] == T_AS)
                         $after_as = true;
-                    elseif ($after_as && $token[0] == T_VARIABLE)
+                    elseif ($after_as && $token[0] == T_VARIABLE) {
                         // Technically, variables defined in a foreach()
                         // block are still accessible after the completion
                         // of the foreach block
-                        $scope[$token[1]] = 1;
+                        $scope[$token[1]] = $byref
+                            ? self::BYREF | self::DEFINED : self::DEFINED;
+                        $byref = false;
+                    }
+                    elseif ($token[0] == T_VARIABLE)
+                        // Variable used in scope
+                        $used[$token[1]] = 1;
                 }
                 break;
             case T_LIST:
@@ -266,8 +317,11 @@ class SourceAnalyzer extends Test {
                         break;
                     elseif (!is_array($token))
                         continue;
-                    elseif ($token[0] == T_VARIABLE)
-                        $scope[$token[1]] = 1;
+                    elseif ($token[0] == T_VARIABLE) {
+                        if (!isset($scope[$token[1]]))
+                            $scope[$token[1]] = self::DEFINED;
+                        $used[$token[1]] = 1;
+                    }
                 }
                 break;
             case T_ISSET:
@@ -277,6 +331,10 @@ class SourceAnalyzer extends Test {
                 while (list(,$token) = each($this->tokens)) {
                     if ($token == ')')
                         break;
+                    elseif (!is_array($token) || $token[0] != T_VARIABLE)
+                        continue;
+                    else
+                        $used[$token[1]] = 1;
                 }
                 break;
             case T_UNSET:
@@ -308,7 +366,7 @@ class SourceAnalyzer extends Test {
                     elseif ($token[0] == T_VARIABLE)
                         $variable = $token[1];
                 }
-                $scope[$variable] = 1;
+                $scope[$variable] = self::DEFINED;
                 $scope = $this->checkVariableUsage($function, $scope, 1,
                     $options);
                 // Variable is no longer in scope; however, other variables
