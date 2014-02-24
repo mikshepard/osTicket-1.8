@@ -1516,12 +1516,6 @@ class Ticket {
         elseif(!$vars['ip_address'] && $_SERVER['REMOTE_ADDR'])
             $vars['ip_address'] = $_SERVER['REMOTE_ADDR'];
 
-        $errors = array();
-        if(!($message = $this->getThread()->addMessage($vars, $errors)))
-            return null;
-
-        $this->setLastMsgId($message->getId());
-
         //Add email recipients as collaborators...
         if ($vars['recipients']
                 //Only add if we have a matched local address
@@ -1529,7 +1523,7 @@ class Ticket {
             //New collaborators added by other collaborators are disable --
             // requires staff approval.
             $info = array(
-                    'isactive' => ($message->getUserId() == $this->getUserId())? 1: 0);
+                'isactive' => ($vars['userId'] == $this->getUserId()) ? 1 : 0);
             $collabs = array();
             foreach ($vars['recipients'] as $recipient) {
                 // Skip virtual delivered-to addresses
@@ -1550,6 +1544,12 @@ class Ticket {
                         implode("<br>", $collabs), 'EndUser', false);
             }
         }
+
+        $errors = array();
+        if(!($message = $this->getThread()->addMessage($vars, $errors)))
+            return null;
+
+        $this->setLastMsgId($message->getId());
 
         if(!$alerts) return $message; //Our work is done...
 

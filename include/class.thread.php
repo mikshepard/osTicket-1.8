@@ -644,7 +644,7 @@ Class ThreadEntry {
         if ($mailinfo['userId']
                 || strcasecmp($mailinfo['email'], $ticket->getEmail()) == 0) {
             $vars['message'] = $body;
-            $vars['userId'] = $mailinfo['userId'] ? $mailinfo['userId'] : $ticket->getUserId();
+            $vars['userId'] = $mailinfo['userId'] ?: $ticket->getUserId();
             return $ticket->postMessage($vars, 'Email');
         }
         // XXX: Consider collaborator role
@@ -668,6 +668,13 @@ Class ThreadEntry {
                 return $ticket->postNote($vars, $errors, $poster);
             }
         }
+        // Find the user id by identifying the user as a collaborator
+        elseif ($user = User::lookup(array(
+                'emails__address'=>$mailinfo['email']))) {
+            $vars['userId'] = $user->getId();
+            $vars['message'] = $body;
+            return $ticket->postMessage($vars, 'Email');
+        }
         // TODO: Consider security constraints
         else {
             //XXX: Are we potentially leaking the email address to
@@ -675,6 +682,7 @@ Class ThreadEntry {
             $vars['message'] = sprintf("Received From: %s\n\n%s",
                 $mailinfo['email'], $body);
             $vars['userId'] = 0; //Unknown user! //XXX: Assume ticket owner?
+
             return $ticket->postMessage($vars, 'Email');
         }
         // Currently impossible, but indicate that this thread object could
