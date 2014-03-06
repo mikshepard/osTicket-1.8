@@ -635,6 +635,7 @@ Class ThreadEntry {
             'poster' => $mailinfo['name'],
             'origin' => 'Email',
             'source' => 'Email',
+            'flags' => $mailinfo['flags'],
             'ip' =>     '',
             'reply_to' => $this,
             'recipients' => $mailinfo['recipients'],

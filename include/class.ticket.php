@@ -1818,6 +1818,10 @@ class Ticket {
         if(!($note=$this->getThread()->addNote($vars, $errors)))
             return null;
 
+        if (isset($vars['flags']) && $vars['flags']['bounce'])
+            // No alerts for bounce emails
+            $alert = false;
+
         //Set state: Error on state change not critical!
         if(isset($vars['state']) && $vars['state']) {
             if($this->setState($vars['state']))
@@ -2389,7 +2393,7 @@ class Ticket {
 
         # Messages that are clearly auto-responses from email systems should
         # not have a return 'ping' message
-        if ($autorespond && $message->isAutoReply())
+        if ($autorespond && $message->isBounceOrAutoReply())
             $autorespond = false;
 
         //post canned auto-response IF any (disables new ticket auto-response).
