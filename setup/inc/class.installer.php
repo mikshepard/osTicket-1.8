@@ -150,6 +150,7 @@ class Installer extends SetupWizard {
             // TODO: Use language selected from install worksheet
             require_once INCLUDE_DIR.'class.i18n.php';
 
+            db_begin();
             $i18n = new Internationalization('en_US');
             $i18n->loadDefaultData();
 
@@ -269,6 +270,7 @@ class Installer extends SetupWizard {
             .', log='.db_input($msg)
             .', ip_address='.db_input($_SERVER['REMOTE_ADDR']);
         db_query($sql, false);
+        db_commit();
 
         return true;
     }

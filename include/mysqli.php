@@ -282,4 +282,25 @@ function db_errno() {
     global $__db;
     return $__db->errno;
 }
+
+function db_begin() {
+    global $__db;
+    $__db->autocommit(false);
+    if (function_exists('mysqli_begin_transaction'))
+        return $__db->begin_transaction();
+}
+
+function db_commit($autocommit=true) {
+    global $__db;
+    if ($autocommit)
+        $__db->autocommit(true);
+    else
+        $__db->commit();
+}
+
+function db_rollback() {
+    global $__db;
+    return $__db->rollback();
+}
+
 ?>
