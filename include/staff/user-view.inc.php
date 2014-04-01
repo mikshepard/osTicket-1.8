@@ -105,8 +105,10 @@ if(!defined('OSTSCPINC') || !$thisstaff || !is_object($user)) die('Invalid path'
 <ul class="tabs">
     <li><a class="active" id="tickets_tab" href="#tickets"><i
     class="icon-list-alt"></i>&nbsp;User Tickets</a></li>
+    <li><a id="activity_tab" href="#activity"><i
+    class="icon-rss"></i>&nbsp;Recent Activity</a></li>
 </ul>
-<div id="tickets">
+<div id="tickets" class="tab_content">
 <?php
 //List all tickets the user
 
@@ -258,6 +260,45 @@ if ($results) { ?>
 </form>
 <?php
  } ?>
+</div>
+
+<div id="activity" style="display:none" class="tab_content">
+<?php
+    $sql = 'SELECT ticket.ticket_id, ticket.`number`, thread.`title`,
+    answer.value, thread.`source`, thread.`created`, ticket.`created`,
+    ticket.`source`
+        FROM '.TICKET_THREAD_TABLE
+     .' thread JOIN '.TICKET_TABLE
+     .' ticket ON (ticket.ticket_id = thread.ticket_id)
+        JOIN '.FORM_ENTRY_TABLE
+     .' entry ON (entry.object_type=\'T\' AND entry.object_id = ticket.ticket_id)
+        JOIN '.FORM_ANSWER_TABLE
+     .' answer ON (entry.id = answer.entry_id)
+        JOIN '.FORM_FIELD_TABLE
+     .' field on (answer.field_id = field.id)
+        WHERE thread.user_id='.db_input($user->getId())
+     .' AND field.name = \'subject\'
+        ORDER BY thread.created DESC LIMIT 25';
+
+    $res = db_query($sql);
+    while ($row = db_fetch_row($res)) {
+        if ($row[5] == $row[6]) {
+            $activity = 'new-ticket';
+            $text = sprintf('New ticket %d opened, "%s", '
+                .' via %s.', $row[1], $row[2] ?: $row[3], $row[4] ?: $row[7]);
+        }
+        else {
+            $activity = 'new-message';
+            $text = sprintf('%s logged a new message, %s, via %s',
+                $user, $row[2] ?: '<i>No subject</i>',
+                $row[1] ?: '<i>Message in a bottle</i>');
+        } ?>
+    <div class="activity <?php echo $activity; ?>">
+        <i class="icon-comment icon-2x icon-muted"></i>
+        <div class="description"><?php echo $text; ?></div>
+        <div class="timing"><?php echo Format::humanize($row[5]); ?></div>
+    </div>
+    <?php } ?>
 </div>
 
 <div style="display:none;" class="dialog" id="confirm-action">

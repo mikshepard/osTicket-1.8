@@ -1559,3 +1559,22 @@ div.selected-signature {
 div.selected-signature .inner {
     opacity: 0.5;
 }
+
+.activity {
+    padding: 7px;
+    border: 1px solid #bbb;
+}
+.activity + .activity {
+    border-top: 0;
+}
+.activity i,
+.activity div {
+    display: inline-block;
+    vertical-align: middle;
+}
+.activity div.description {
+    width: 60%;
+    margin-left: 1em;
+    font-size: 15px;
+    font-weight: bold;
+}

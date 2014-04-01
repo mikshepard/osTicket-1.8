@@ -465,6 +465,33 @@ class Format {
         return date($format, ($gmtimestamp+ ($offset*3600)));
     }
 
+    function humanize($time) {
+        $then = Misc::db2gmtime($time);
+        $now = gmmktime();
+        $diff = $now - $then;
+        if ($diff < 60)
+            return 'Just now';
+        elseif ($diff < 120)
+            return 'About a minute ago';
+        elseif ($diff < 300)
+            return 'A few minutes ago';
+        elseif ($diff < 3600)
+            return sprintf('About %d minutes ago', $diff / 60);
+        elseif ($diff < 7200)
+            return 'About an hour ago';
+        elseif ($diff < (16 * 3600))
+            return sprintf('About %d hours ago', $diff / 3600);
+        elseif ($diff < (2 * 86400))
+            return 'Yesterday';
+        elseif ($diff < (7 * 86400))
+            return strftime('On %A', $time);
+        elseif ($diff < (14 * 86400))
+            return strftime('Last %A', $time);
+        else
+            return self::db_datetime($time);
+        return $diff;
+    }
+
     // Thanks, http://stackoverflow.com/a/2955878/1025836
     /* static */
     function slugify($text) {
