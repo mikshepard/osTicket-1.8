@@ -14,7 +14,7 @@
     vim: expandtab sw=4 ts=4 sts=4:
 **********************************************************************/
 
-define('THIS_DIR', str_replace('\\', '/', realpath(dirname(__FILE__))) . '/'); //Include path..
+define('THIS_DIR', str_replace('\\', '/', Misc::realpath(dirname(__FILE__))) . '/'); //Include path..
 
 require_once(INCLUDE_DIR.'mpdf/mpdf.php');
 
@@ -56,7 +56,7 @@ class Ticket2PDF extends mPDF
             return INCLUDE_DIR.'fpdf/print-logo.png';
         }
 
-        $tmp = tempnam("", 'pdf') . '.jpg';
+        $tmp = tempnam(sys_get_temp_dir(), 'pdf') . '.jpg';
         $img = imagecreatefromstring($logo->getData());
         // Handle transparent images with white background
         $img2 = imagecreatetruecolor(imagesx($img), imagesy($img));
@@ -291,7 +291,7 @@ class Ticket2PDF extends mPDF
                 $this->WriteCell($w/2, 7, Format::db_datetime($entry['created']), 'LTB', 0, 'L', true);
                 $this->SetFont('Arial', '', 10);
                 $this->WriteCell($w, 7, Format::truncate($entry['title'], 50), 'TB', 0, 'L', true);
-                $this->WriteCell($w/2, 7, $entry['poster'], 'TBR', 1, 'L', true);
+                $this->WriteCell($w/2, 7, $entry['name'] ?: $entry['poster'], 'TBR', 1, 'L', true);
                 $this->SetFont('');
                 $text= $entry['body'];
                 if($entry['attachments']

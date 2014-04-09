@@ -19,13 +19,14 @@ class Filter {
     var $ht;
 
     static $match_types = array(
-        'Basic Fields' => array(
+        'User Information' => array(
             'name'      => 'Name',
             'email'     => 'Email',
-            'subject'   => 'Subject',
-            'body'      => 'Body/Text',
+        ),
+        'Email Meta-Data' => array(
             'reply-to'  => 'Reply-To Email',
             'reply-to-name' => 'Reply-To Name',
+            'addressee' => 'Addressee (To and Cc)',
         ),
     );
 
@@ -242,12 +243,14 @@ class Filter {
 
         $how = array(
             # how => array(function, null or === this, null or !== this)
-            'equal'     => array('strcmp', 0),
-            'not_equal' => array('strcmp', null, 0),
-            'contains'  => array('strpos', null, false),
-            'dn_contain'=> array('strpos', false),
-            'starts'    => array('strpos', 0),
-            'ends'      => array('endsWith', true)
+            'equal'     => array('strcasecmp', 0),
+            'not_equal' => array('strcasecmp', null, 0),
+            'contains'  => array('stripos', null, false),
+            'dn_contain'=> array('stripos', false),
+            'starts'    => array('stripos', 0),
+            'ends'      => array('iendsWith', true),
+            'match'     => array('pregMatchB', 1),
+            'not_match' => array('pregMatchB', null, 0),
         );
 
         $match = false;
@@ -260,12 +263,8 @@ class Filter {
         foreach ($this->getRules() as $rule) {
             if (!isset($how[$rule['h']])) continue;
             list($func, $pos, $neg) = $how[$rule['h']];
-            # TODO: convert $what and $rule['v'] to mb_strtoupper and do
-            #       case-sensitive, binary-safe comparisons. Would be really
-            #       nice to do $rule['v'] on the database side for
-            #       performance -- but ::getFlatRules() is a blocker
-            $result = call_user_func($func, strtoupper($what[$rule['w']]),
-                strtoupper($rule['v']));
+
+            $result = call_user_func($func, $what[$rule['w']], $rule['v']);
             if (($pos === null && $result !== $neg) or ($result === $pos)) {
                 # Match.
                 $match = true;
@@ -341,7 +340,9 @@ class Filter {
             'contains'=>    'Contains',
             'dn_contain'=>  'Does Not Contain',
             'starts'=>      'Starts With',
-            'ends'=>        'Ends With'
+            'ends'=>        'Ends With',
+            'match'=>       'Matches Regex',
+            'not_match'=>   'Does Not Match Regex',
         );
     }
 
@@ -404,6 +405,14 @@ class Filter {
         $rules=array();
         for($i=1; $i<=25; $i++) { //Expecting no more than 25 rules...
             if($vars["rule_w$i"] || $vars["rule_h$i"]) {
+                // Check for REGEX compile errors
+                if (in_array($vars["rule_h$i"], array('match','not_match'))) {
+                    $wrapped = "/".$vars["rule_v$i"]."/iu";
+                    if (false === @preg_match($vars["rule_v$i"], ' ')
+                            && (false !== @preg_match($wrapped, ' ')))
+                        $vars["rule_v$i"] = $wrapped;
+                }
+
                 if(!$vars["rule_w$i"] || !in_array($vars["rule_w$i"],$matches))
                     $errors["rule_$i"]='Invalid match selection';
                 elseif(!$vars["rule_h$i"] || !in_array($vars["rule_h$i"],$types))
@@ -414,6 +423,12 @@ class Filter {
                         && $vars["rule_h$i"]=='equal'
                         && !Validator::is_email($vars["rule_v$i"]))
                     $errors["rule_$i"]='Valid email required for the match type';
+                elseif (in_array($vars["rule_h$i"], array('match','not_match'))
+                        && (false === @preg_match($vars["rule_v$i"], ' ')))
+                    $errors["rule_$i"] = sprintf('Regex compile error: (#%s)',
+                        preg_last_error());
+
+
                 else //for everything-else...we assume it's valid.
                     $rules[]=array('what'=>$vars["rule_w$i"],
                         'how'=>$vars["rule_h$i"],'val'=>$vars["rule_v$i"]);
@@ -679,6 +694,13 @@ class TicketFilter {
             if (in_array($k, $interest))
                 $this->vars[$k] = trim($v);
         }
+        if (isset($vars['recipients']) && $vars['recipients']) {
+            foreach ($vars['recipients'] as $r) {
+                $this->vars['addressee'][] = $r['name'];
+                $this->vars['addressee'][] = $r['email'];
+            }
+            $this->vars['addressee'] = implode(' ', $this->vars['addressee']);
+        }
 
          //Init filters.
         $this->build();
@@ -818,19 +840,22 @@ class TicketFilter {
      *    http://msdn.microsoft.com/en-us/library/ee219609(v=exchg.80).aspx
      */
     /* static */
-    function isAutoResponse($headers) {
+    function isAutoReply($headers) {
 
         if($headers && !is_array($headers))
             $headers = Mail_Parse::splitHeaders($headers);
 
         $auto_headers = array(
-            'Auto-Submitted'    => 'AUTO-REPLIED',
+            'Auto-Submitted'    => array('AUTO-REPLIED', 'AUTO-GENERATED'),
             'Precedence'        => array('AUTO_REPLY', 'BULK', 'JUNK', 'LIST'),
-            'Subject'           => array('OUT OF OFFICE', 'AUTO-REPLY:', 'AUTORESPONSE'),
+            'X-Precedence'      => array('AUTO_REPLY', 'BULK', 'JUNK', 'LIST'),
             'X-Autoreply'       => 'YES',
             'X-Auto-Response-Suppress' => array('ALL', 'DR', 'RN', 'NRN', 'OOF', 'AutoReply'),
-            'X-Autoresponse'    => '',
-            'X-Auto-Reply-From' => ''
+            'X-Autoresponse'    => '*',
+            'X-AutoReply-From'  => '*',
+            'X-Autorespond'     => '*',
+            'X-Mail-Autoreply'  => '*',
+            'X-Autogenerated'   => 'REPLY',
         );
 
         foreach ($auto_headers as $header=>$find) {
@@ -846,39 +871,44 @@ class TicketFilter {
                 foreach ($find as $f)
                     if (strpos($value, $f) === 0)
                         return true;
+            } elseif ($find === '*') {
+                return true;
             } elseif (strpos($value, $find) === 0) {
                 return true;
             }
         }
 
-        # Bounces also counts as auto-responses.
-        if(self::isAutoBounce($headers))
-            return true;
-
         return false;
     }
 
-    function isAutoBounce($headers) {
+    static function isBounce($headers) {
 
         if($headers && !is_array($headers))
             $headers = Mail_Parse::splitHeaders($headers);
 
         $bounce_headers = array(
-            'From'          => array('<MAILER-DAEMON@MAILER-DAEMON>', 'MAILER-DAEMON', '<>'),
-            'Subject'       => array('DELIVERY FAILURE', 'DELIVERY STATUS', 'UNDELIVERABLE:'),
+            'From'  => array('stripos',
+                        array('MAILER-DAEMON', '<>'), null, false),
+            'Subject'   => array('stripos',
+                array('DELIVERY FAILURE', 'DELIVERY STATUS',
+                    'UNDELIVERABLE:', 'Undelivered Mail Returned'), 0),
+            'Return-Path'   => array('strcmp', array('<>'), 0),
+            'Content-Type'  => array('stripos', array('report-type=delivery-status'), null, false),
+            'X-Failed-Recipients' => array('strpos', array('@'), null, false)
         );
 
         foreach ($bounce_headers as $header => $find) {
             if(!isset($headers[$header])) continue;
 
-            $value = strtoupper($headers[$header]);
+            @list($func, $searches, $pos, $neg) = $find;
 
-            if (is_array($find)) {
-                foreach ($find as $f)
-                    if (strpos($value, $f) === 0)
-                        return true;
-            } elseif (strpos($value, $find) === 0) {
-                return true;
+            if(!($value = $headers[$header]) || !is_array($searches))
+                continue;
+
+            foreach ($searches as $f) {
+                $result = call_user_func($func, $value, $f);
+                if (($pos === null && $result !== $neg) or ($result === $pos))
+                    return true;
             }
         }
 
@@ -902,13 +932,17 @@ class TicketFilter {
  * Returns TRUE if the haystack ends with needle and FALSE otherwise.
  * Thanks, http://stackoverflow.com/a/834355
  */
-function endsWith($haystack, $needle)
+function iendsWith($haystack, $needle)
 {
-    $length = strlen($needle);
+    $length = mb_strlen($needle);
     if ($length == 0) {
         return true;
     }
 
-    return (substr($haystack, -$length) === $needle);
+    return (strcasecmp(mb_substr($haystack, -$length), $needle) === 0);
+}
+
+function pregMatchB($subject, $pattern) {
+    return preg_match($pattern, $subject);
 }
 ?>

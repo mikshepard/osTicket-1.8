@@ -131,12 +131,13 @@ showImagesInline = function(urls, thread_id) {
         ? '.thread-body img[data-cid]'
         : '.thread-body#thread-id-'+thread_id+' img[data-cid]';
     $(selector).each(function(i, el) {
-        var cid = $(el).data('cid'),
+        var cid = $(el).data('cid').toLowerCase(),
             info = urls[cid],
             e = $(el);
         if (info) {
             // Add a hover effect with the filename
-            var timeout, caption = $('<div class="image-hover">');
+            var timeout, caption = $('<div class="image-hover">')
+                .css({'float':e.css('float')});
             e.wrap(caption).parent()
                 .hover(
                     function() {

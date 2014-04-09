@@ -15,6 +15,7 @@ if($template && $_REQUEST['a']!='add'){
     $action='add';
     $submit_text='Add Template';
     $info['isactive']=isset($info['isactive'])?$info['isactive']:0;
+    $info['lang_id'] = $cfg->getSystemLanguage();
     $qstr.='&a='.urlencode($_REQUEST['a']);
 }
 $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
@@ -54,52 +55,74 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                 &nbsp;<span class="error">*&nbsp;<?php echo $errors['isactive']; ?></span>
             </td>
         </tr>
+        <?php
+        if($template){ ?>
         <tr>
             <td width="180" class="required">
                 Language:
             </td>
             <td>
+                <?php
+            $langs = Internationalization::availableLanguages();
+            $lang = strtolower($info['lang']);
+            if (isset($langs[$lang]))
+                echo $langs[$lang]['desc'];
+            else
+                echo $info['lang']; ?>
+            </td>
+        </tr>
+        <?php
+            $current_group = false;
+            $impl = $template->getTemplates();
+            $_tpls = $template::$all_names;
+            $_groups = $template::$all_groups;
+            uasort($_tpls, function($a,$b) {
+                return strcmp($a['group'].$a['name'], $b['group'].$b['name']);
+            });
+         foreach($_tpls as $cn=>$info){
+             if (!$info['name'])
+                 continue;
+             if (!$current_group || $current_group != $info['group']) {
+                $current_group = $info['group']; ?>
+        <tr>
+            <th colspan="2">
+            <em><strong><?php echo isset($_groups[$current_group])
+            ? $_groups[$current_group] : $current_group; ?></strong>
+            :: Click on the title to edit.&nbsp;</em>
+            </th>
+        </tr>
+<?php } # end if ($current_group)
+            if (isset($impl[$cn])) {
+                echo sprintf('<tr><td colspan="2">&nbsp;<strong><a href="templates.php?id=%d&a=manage">%s</a></strong>, <span class="faded">Updated %s</span><br/>&nbsp;%s</td></tr>',
+                $impl[$cn]->getId(), Format::htmlchars($info['name']),
+                Format::db_datetime($impl[$cn]->getLastUpdated()),
+                Format::htmlchars($info['desc']));
+            } else {
+                echo sprintf('<tr><td colspan=2>&nbsp;<strong><a
+                    href="templates.php?tpl_id=%d&a=implement&code_name=%s"
+                    >%s</a></strong><br/>&nbsp%s</td></tr>',
+                    $template->getid(),$cn,format::htmlchars($info['name']),
+                    format::htmlchars($info['desc']));
+            }
+         } # endfor
+        } else { ?>
+        <tr>
+            <td width="180" class="required">
+                Language:
+            </td>
+            <td>
+        <?php
+        $langs = Internationalization::availableLanguages(); ?>
                 <select name="lang_id">
-                    <option value="en" selected="selected">English (US)</option>
+<?php foreach($langs as $l) {
+    $selected = ($info['lang_id'] == $l['code']) ? 'selected="selected"' : ''; ?>
+                    <option value="<?php echo $l['code']; ?>" <?php echo $selected;
+                        ?>><?php echo $l['desc']; ?></option>
+<?php } ?>
                 </select>
                 &nbsp;<span class="error">*&nbsp;<?php echo $errors['lang_id']; ?></span>
             </td>
         </tr>
-        <?php
-        if($template){ ?>
-        <tr>
-            <th colspan="2">
-                <em><strong>Template Messages</strong>: Click on the message to edit.&nbsp;
-                    <span class="error">*&nbsp;<?php echo $errors['rules']; ?></span></em>
-            </th>
-        </tr>
-        <?php
-         foreach($template->getTemplates() as $tpl){
-             $info = $tpl->getDescription();
-             if (!$info['name'])
-                 continue;
-            echo sprintf('<tr><td colspan=2>&nbsp;<strong><a href="templates.php?id=%d&a=manage">%s</a></strong>&nbsp-&nbsp<em>%s</em></td></tr>',
-                    $tpl->getId(),Format::htmlchars($info['name']),
-                    Format::htmlchars($info['desc']));
-         }
-         if (($undef = $template->getUndefinedTemplateNames())) { ?>
-        <tr>
-            <th colspan="2">
-                <em><strong>Unimplemented Template Messages</strong>: Click
-                on the message to implement</em>
-            </th>
-        </tr>
-        <?php
-            foreach($template->getUndefinedTemplateNames() as $cn=>$info){
-                echo sprintf('<tr><td colspan=2>&nbsp;<strong><a
-                    href="templates.php?tpl_id=%d&a=implement&code_name=%s"
-                    style="color:red;text-decoration:underline"
-                    >%s</a></strong>&nbsp-&nbsp<em>%s</em></td></tr>',
-                    $template->getId(),$cn,Format::htmlchars($info['name']),
-                    Format::htmlchars($info['desc']));
-            }
-        }
-        }else{ ?>
         <tr>
             <td width="180" class="required">
                 Template To Clone:

@@ -20,6 +20,7 @@ require_once(INCLUDE_DIR.'class.dept.php');
 require_once(INCLUDE_DIR.'class.email.php');
 require_once(INCLUDE_DIR.'class.filter.php');
 require_once(INCLUDE_DIR.'html2text.php');
+require_once(INCLUDE_DIR.'tnef_decoder.php');
 
 class MailFetcher {
 
@@ -29,6 +30,8 @@ class MailFetcher {
     var $srvstr;
 
     var $charset = 'UTF-8';
+
+    var $tnef = false;
 
     function MailFetcher($email, $charset='UTF-8') {
 
@@ -269,9 +272,9 @@ class MailFetcher {
 
         $sender=$headerinfo->from[0];
         //Just what we need...
-        $header=array('name'  =>@$sender->personal,
+        $header=array('name'  => $this->mime_decode(@$sender->personal),
                       'email'  => trim(strtolower($sender->mailbox).'@'.$sender->host),
-                      'subject'=>@$headerinfo->subject,
+                      'subject'=> $this->mime_decode(@$headerinfo->subject),
                       'mid'    => trim(@$headerinfo->message_id),
                       'header' => $this->getHeader($mid),
                       'in-reply-to' => $headerinfo->in_reply_to,
@@ -283,22 +286,56 @@ class MailFetcher {
             $header['reply-to-name'] = $replyto[0]->personal;
         }
 
-        //Try to determine target email - useful when fetched inbox has
-        // aliases that are independent emails within osTicket.
-        $emailId = 0;
+        // Put together a list of recipients
         $tolist = array();
         if($headerinfo->to)
-            $tolist = array_merge($tolist, $headerinfo->to);
+            $tolist['to'] = $headerinfo->to;
         if($headerinfo->cc)
-            $tolist = array_merge($tolist, $headerinfo->cc);
-        if($headerinfo->bcc)
-            $tolist = array_merge($tolist, $headerinfo->bcc);
+            $tolist['cc'] = $headerinfo->cc;
 
-        foreach($tolist as $addr)
-            if(($emailId=Email::getIdByEmail(strtolower($addr->mailbox).'@'.$addr->host)))
-                break;
+        //Add delivered-to address to list.
+        if (stripos($header['header'], 'delivered-to:') !==false
+                && ($dt = Mail_Parse::findHeaderEntry($header['header'],
+                     'delivered-to', true))) {
+            if (($delivered_to = Mail_Parse::parseAddressList($dt)))
+                $tolist['delivered-to'] = $delivered_to;
+        }
 
-        $header['emailId'] = $emailId;
+        $header['recipients'] = array();
+        foreach($tolist as $source => $list) {
+            foreach($list as $addr) {
+                if (!($emailId=Email::getIdByEmail(strtolower($addr->mailbox).'@'.$addr->host))) {
+                    //Skip virtual Delivered-To addresses
+                    if ($source == 'delivered-to') continue;
+
+                    $header['recipients'][] = array(
+                            'source' => "Email ($source)",
+                            'name' => $this->mime_decode(@$addr->personal),
+                            'email' => strtolower($addr->mailbox).'@'.$addr->host);
+                } elseif(!$header['emailId']) {
+                    $header['emailId'] = $emailId;
+                }
+            }
+        }
+
+        //See if any of the recipients is a delivered to address
+        if ($tolist['delivered-to']) {
+            foreach ($tolist['delivered-to'] as $addr) {
+                foreach ($header['recipients'] as $i => $r) {
+                    if (strcasecmp($r['email'], $addr->mailbox.'@'.$addr->host) === 0)
+                        $header['recipients'][$i]['source'] = 'delivered-to';
+                }
+            }
+        }
+
+        //BCCed?
+        if(!$header['emailId']) {
+            if ($headerinfo->bcc) {
+                foreach($headerinfo->bcc as $addr)
+                    if (($header['emailId'] = Email::getIdByEmail(strtolower($addr->mailbox).'@'.$addr->host)))
+                        break;
+            }
+        }
 
         // Ensure we have a message-id. If unable to read it out of the
         // email, use the hash of the entire email headers
@@ -311,7 +348,7 @@ class MailFetcher {
     }
 
     //search for specific mime type parts....encoding is the desired encoding.
-    function getPart($mid, $mimeType, $encoding=false, $struct=null, $partNumber=false) {
+    function getPart($mid, $mimeType, $encoding=false, $struct=null, $partNumber=false, $recurse=-1) {
 
         if(!$struct && $mid)
             $struct=@imap_fetchstructure($this->mbox, $mid);
@@ -343,13 +380,18 @@ class MailFetcher {
             }
         }
 
+        if ($this->tnef && !strcasecmp($mimeType, 'text/html')
+                && ($content = $this->tnef->getBody('text/html', $encoding)))
+            return $content;
+
         //Do recursive search
         $text='';
-        if($struct && $struct->parts) {
+        if($struct && $struct->parts && $recurse) {
             while(list($i, $substruct) = each($struct->parts)) {
                 if($partNumber)
                     $prefix = $partNumber . '.';
-                if(($result=$this->getPart($mid, $mimeType, $encoding, $substruct, $prefix.($i+1))))
+                if (($result=$this->getPart($mid, $mimeType, $encoding,
+                        $substruct, $prefix.($i+1), $recurse-1)))
                     $text.=$result;
             }
         }
@@ -437,8 +479,50 @@ class MailFetcher {
         return imap_fetchheader($this->mbox, $mid,FT_PREFETCHTEXT);
     }
 
+    function isBounceNotice($mid) {
+        if (!($body = $this->getPart($mid, 'message/delivery-status')))
+            return false;
+
+        $info = Mail_Parse::splitHeaders($body);
+        if (!isset($info['Action']))
+            return false;
+
+        return strcasecmp($info['Action'], 'failed') === 0;
+    }
+
+    function getDeliveryStatusMessage($mid) {
+        if (!($struct = @imap_fetchstructure($this->mbox, $mid)))
+            return false;
+
+        $ctype = $this->getMimeType($struct);
+        if (strtolower($ctype) == 'multipart/report') {
+            foreach ($struct->parameters as $p) {
+                if (strtolower($p->attribute) == 'report-type'
+                        && $p->value == 'delivery-status') {
+                    return new TextThreadBody( $this->getPart(
+                                $mid, 'text/plain', $this->charset, $struct, false, 1));
+                }
+            }
+        }
+        return false;
+    }
+
+    function getOriginalMessage($mid) {
+        if (!($body = $this->getPart($mid, 'message/rfc822')))
+            return null;
+
+        $msg = new Mail_Parse($body);
+        if (!$msg->decode())
+            return null;
+
+        return $msg->struct;
+    }
 
     function getPriority($mid) {
+        if ($this->tnef && isset($this->tnef->Importance))
+            // PidTagImportance is 0, 1, or 2
+            // http://msdn.microsoft.com/en-us/library/ee237166(v=exchg.80).aspx
+            return $this->tnef->Importance + 1;
         return Mail_Parse::parsePriority($this->getHeader($mid));
     }
 
@@ -446,27 +530,23 @@ class MailFetcher {
         global $cfg;
 
         if ($cfg->isHtmlThreadEnabled()) {
-            if ($body=$this->getPart($mid, 'text/html', $this->charset)) {
-                //Cleanup the html.
-                $body = (trim($body, " <>br/\t\n\r"))
-                    ? Format::safe_html($body)
-                    : '--';
-            }
-            elseif ($body=$this->getPart($mid, 'text/plain', $this->charset)) {
-                $body = trim($body)
-                    ? sprintf('<pre>%s</pre>',
-                        Format::htmlchars($body))
-                    : '--';
-            }
+            if ($html=$this->getPart($mid, 'text/html', $this->charset))
+                $body = new HtmlThreadBody($html);
+            elseif ($text=$this->getPart($mid, 'text/plain', $this->charset))
+                $body = new TextThreadBody($text);
         }
-        else {
-            if (!($body=$this->getPart($mid, 'text/plain', $this->charset))) {
-                if ($body=$this->getPart($mid, 'text/html', $this->charset)) {
-                    $body = Format::html2text(Format::safe_html($body), 100, false);
-                }
-            }
-            $body = trim($body) ? $body : '--';
-        }
+        elseif ($text=$this->getPart($mid, 'text/plain', $this->charset))
+            $body = new TextThreadBody($text);
+        elseif ($html=$this->getPart($mid, 'text/html', $this->charset))
+            $body = new TextThreadBody(
+                    Format::html2text(Format::safe_html($html),
+                        100, false));
+        else
+            $body = new TextThreadBody('');
+
+        if ($cfg->stripQuotedReply())
+            $body->stripQuotedReply($cfg->getReplySeparator());
+
         return $body;
     }
 
@@ -477,6 +557,23 @@ class MailFetcher {
         if(!($mailinfo = $this->getHeaderInfo($mid)))
             return false;
 
+        // TODO: If the content-type of the message is 'message/rfc822',
+        // then this is a message with the forwarded message as the
+        // attachment. Download the body and pass it along to the mail
+        // parsing engine.
+        $info = Mail_Parse::splitHeaders($mailinfo['header']);
+        if (strtolower($info['Content-Type']) == 'message/rfc822') {
+            if ($wrapped = $this->getPart($mid, 'message/rfc822')) {
+                require_once INCLUDE_DIR.'api.tickets.php';
+                // Simulate piping the contents into the system
+                $api = new TicketApiController();
+                $parser = new EmailDataParser();
+                if ($data = $parser->parse($wrapped))
+                    return $api->processEmail($data);
+            }
+            // If any of this fails, create the ticket as usual
+        }
+
 	    //Is the email address banned?
         if($mailinfo['email'] && TicketFilter::isBanned($mailinfo['email'])) {
 	        //We need to let admin know...
@@ -484,19 +581,53 @@ class MailFetcher {
 	        return true; //Report success (moved or delete)
         }
 
+        // Parse MS TNEF emails
+        if (($struct = imap_fetchstructure($this->mbox, $mid))
+                && ($attachments = $this->getAttachments($struct))) {
+            foreach ($attachments as $i=>$info) {
+                if (0 === strcasecmp('application/ms-tnef', $info['type'])) {
+                    try {
+                        $data = $this->decode(imap_fetchbody($this->mbox,
+                            $mid, $info['index']), $info['encoding']);
+                        $tnef = new TnefStreamParser($data);
+                        $this->tnef = $tnef->getMessage();
+                        // No longer considered an attachment
+                        unset($attachments[$i]);
+                        // There should only be one of these
+                        break;
+                    } catch (TnefException $ex) {
+                        // Noop -- winmail.dat remains an attachment
+                    }
+                }
+            }
+        }
+
         $vars = $mailinfo;
-        $vars['name']=$this->mime_decode($mailinfo['name']);
-        $vars['subject']=$mailinfo['subject']?$this->mime_decode($mailinfo['subject']):'[No Subject]';
-        $vars['message']=Format::stripEmptyLines($this->getBody($mid));
-        $vars['emailId']=$mailinfo['emailId']?$mailinfo['emailId']:$this->getEmailId();
+        $vars['name'] = $mailinfo['name'];
+        $vars['subject'] = $mailinfo['subject'] ?: '[No Subject]';
+        $vars['emailId'] = $mailinfo['emailId'] ?: $this->getEmailId();
+        $vars['to-email-id'] = $mailinfo['emailId'] ?: 0;
+
+        if ($this->isBounceNotice($mid)) {
+            // Fetch the original References and assign to 'references'
+            if ($msg = $this->getOriginalMessage($mid)) {
+                $vars['references'] = $msg->headers['references'];
+                unset($vars['in-reply-to']);
+            }
+            // Fetch deliver status report
+            $vars['message'] = $this->getDeliveryStatusMessage($mid);
+            $vars['thread-type'] = 'N';
+            $vars['flags']['bounce'] = true;
+        }
+        else {
+            $vars['message'] = $this->getBody($mid);
+            $vars['flags']['bounce'] = TicketFilter::isBounce($info);
+        }
+
 
         //Missing FROM name  - use email address.
         if(!$vars['name'])
-            $vars['name'] = $vars['email'];
-
-        //An email with just attachments can have empty body.
-        if(!$vars['message'])
-            $vars['message'] = '-';
+            list($vars['name']) = explode('@', $vars['email']);
 
         if($ost->getConfig()->useEmailPriority())
             $vars['priorityId']=$this->getPriority($mid);
@@ -508,10 +639,18 @@ class MailFetcher {
         $seen = false;
 
         // Fetch attachments if any.
-        if($ost->getConfig()->allowEmailAttachments()
-                && ($struct = imap_fetchstructure($this->mbox, $mid))
-                && ($attachments=$this->getAttachments($struct))) {
-
+        if($ost->getConfig()->allowEmailAttachments()) {
+            // Include TNEF attachments in the attachments list
+            if ($this->tnef) {
+                foreach ($this->tnef->attachments as $at) {
+                    $attachments[] = array(
+                        'cid' => @$at->AttachContentId ?: false,
+                        'data' => $at,
+                        'type' => @$at->AttachMimeTag ?: false,
+                        'name' => $at->getName(),
+                    );
+                }
+            }
             $vars['attachments'] = array();
             foreach($attachments as $a ) {
                 $file = array('name' => $a['name'], 'type' => $a['type']);
@@ -519,6 +658,9 @@ class MailFetcher {
                 //Check the file  type
                 if(!$ost->isFileTypeAllowed($file)) {
                     $file['error'] = 'Invalid file type (ext) for '.Format::htmlchars($file['name']);
+                }
+                elseif (@$a['data'] instanceof TnefAttachment) {
+                    $file['data'] = $a['data']->getData();
                 }
                 else {
                     // only fetch the body if necessary
@@ -555,15 +697,10 @@ class MailFetcher {
                 return true;
             }
 
-            # check if it's a bounce!
-            if($vars['header'] && TicketFilter::isAutoBounce($vars['header'])) {
-                $ost->logWarning('Bounced email', $vars['message'], false);
-                return true;
-            }
-
             //TODO: Log error..
             return null;
         }
+
 
         return $ticket;
     }
@@ -643,24 +780,31 @@ class MailFetcher {
             .' WHERE mail_active=1 '
             .'  AND (mail_errors<='.$MAXERRORS.' OR (TIME_TO_SEC(TIMEDIFF(NOW(), mail_lasterror))>'.($TIMEOUT*60).') )'
             .'  AND (mail_lastfetch IS NULL OR TIME_TO_SEC(TIMEDIFF(NOW(), mail_lastfetch))>mail_fetchfreq*60)'
-            .' ORDER BY mail_lastfetch DESC'
-            .' LIMIT 10'; //Processing up to 10 emails at a time.
+            .' ORDER BY mail_lastfetch ASC';
 
-       // echo $sql;
-        if(!($res=db_query($sql)) || !db_num_rows($res))
+        if (!($res=db_query($sql)) || !db_num_rows($res))
             return;  /* Failed query (get's logged) or nothing to do... */
 
-        //TODO: Lock the table here??
+        //Get max execution time so we can figure out how long we can fetch
+        // take fetching emails.
+        if (!($max_time = ini_get('max_execution_time')))
+            $max_time = 300;
 
-        while(list($emailId, $errors)=db_fetch_row($res)) {
+        //Start time
+        $start_time = Misc::micro_time();
+        while (list($emailId, $errors)=db_fetch_row($res)) {
+            //Break if we're 80% into max execution time
+            if ((Misc::micro_time()-$start_time) > ($max_time*0.80))
+                break;
+
             $fetcher = new MailFetcher($emailId);
-            if($fetcher->connect()) {
+            if ($fetcher->connect()) {
                 db_query('UPDATE '.EMAIL_TABLE.' SET mail_errors=0, mail_lastfetch=NOW() WHERE email_id='.db_input($emailId));
                 $fetcher->fetchEmails();
                 $fetcher->close();
             } else {
                 db_query('UPDATE '.EMAIL_TABLE.' SET mail_errors=mail_errors+1, mail_lasterror=NOW() WHERE email_id='.db_input($emailId));
-                if(++$errors>=$MAXERRORS) {
+                if (++$errors>=$MAXERRORS) {
                     //We've reached the MAX consecutive errors...will attempt logins at delayed intervals
                     $msg="\nosTicket is having trouble fetching emails from the following mail account: \n".
                         "\nUser: ".$fetcher->getUsername().

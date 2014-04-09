@@ -61,6 +61,10 @@ class Validator {
                 $this->errors[$k]=$field['error'];
                 continue;
             }
+
+            //We don't care about the type.
+            if ($field['type'] == '*') continue;
+
             //Do the actual validation based on the type.
             switch(strtolower($field['type'])):
             case 'integer':
@@ -73,7 +77,7 @@ class Validator {
             case 'double':
                 if(!is_numeric($this->input[$k]))
                     $this->errors[$k]=$field['error'];
-            break;
+                break;
             case 'text':
             case 'string':
                 if(!is_string($this->input[$k]))
@@ -84,9 +88,9 @@ class Validator {
                     $this->errors[$k]=$field['error'];
                 break;
             case 'radio':
-            if(!isset($this->input[$k]))
-               $this->errors[$k]=$field['error'];
-            break;
+                if(!isset($this->input[$k]))
+                    $this->errors[$k]=$field['error'];
+                break;
             case 'date': //TODO...make sure it is really in GNU date format..
                 if(strtotime($this->input[$k])===false)
                     $this->errors[$k]=$field['error'];
@@ -137,7 +141,12 @@ class Validator {
     /*** Functions below can be called directly without class instance.
          Validator::func(var..);  (nolint) ***/
     function is_email($email) {
-        return preg_match('/^([*+!.&#$|\'\\%\/0-9a-z^_`{}=?~:-]+)@(([0-9a-z-]+\.)+[0-9a-z]{2,})$/i',$email);
+        if (strpos($email, '@') === false)
+            return false;
+
+        require_once 'Mail/RFC822.php';
+        require_once 'PEAR.php';
+        return !PEAR::isError(Mail_RFC822::parseAddressList($email));
     }
     function is_phone($phone) {
         /* We're not really validating the phone number but just making sure it doesn't contain illegal chars and of acceptable len */
@@ -173,7 +182,7 @@ class Validator {
     function is_username($username, &$error='') {
         if (strlen($username)<2)
             $error = 'At least two (2) characters';
-        elseif (!preg_match('/^[\w._-]+$/', $username))
+        elseif (!preg_match('/^[\p{L}\d._-]+$/u', $username))
             $error = 'Username contains invalid characters';
         return $error == '';
     }

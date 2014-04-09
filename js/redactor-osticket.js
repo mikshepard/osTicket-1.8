@@ -116,8 +116,72 @@ RedactorPlugins.draft = {
                 self.opts.autosave = self.opts.original_autosave;
             }
         });
-    },
+    }
+};
 
+RedactorPlugins.signature = {
+    init: function() {
+        var $el = $(this.$element.get(0)),
+            inner = $('<div class="inner"></div>');
+        if ($el.data('signatureField')) {
+            this.$signatureBox = $('<div class="selected-signature"></div>')
+                .append(inner)
+                .appendTo(this.$box);
+            if ($el.data('signature'))
+                inner.html($el.data('signature'));
+            else
+                this.$signatureBox.hide();
+            $('input[name='+$el.data('signatureField')+']', $el.closest('form'))
+                .on('change', false, false, $.proxy(this.updateSignature, this))
+            if ($el.data('deptField'))
+                $(':input[name='+$el.data('deptField')+']', $el.closest('form'))
+                    .on('change', false, false, $.proxy(this.updateSignature, this))
+            // Expand on hover
+            var outer = this.$signatureBox,
+                inner = $('.inner', this.$signatureBox).get(0),
+                originalHeight = outer.height(),
+                hoverTimeout = undefined,
+                originalShadow = this.$signatureBox.css('box-shadow');
+            this.$signatureBox.hover(function() {
+                hoverTimeout = setTimeout($.proxy(function() {
+                    originalHeight = Math.max(originalHeight, outer.height());
+                    $(this).animate({
+                        'height': inner.offsetHeight
+                    }, 'fast');
+                    $(this).css('box-shadow', 'none', 'important');
+                }, this), 250);
+            }, function() {
+                clearTimeout(hoverTimeout);
+                $(this).stop().animate({
+                    'height': Math.min(inner.offsetHeight, originalHeight)
+                }, 'fast');
+                $(this).css('box-shadow', originalShadow);
+            });
+        }
+    },
+    updateSignature: function(e) {
+        var $el = $(this.$element.get(0));
+            selected = $(':input:checked[name='+$el.data('signatureField')+']', $el.closest('form')).val(),
+            type = $(e.target).val(),
+            dept = $(':input[name='+$el.data('deptField')+']', $el.closest('form')).val(),
+            url = 'ajax.php/content/signature/',
+            inner = $('.inner', this.$signatureBox);
+        e.preventDefault && e.preventDefault();
+        if (selected == 'dept' && $el.data('deptId'))
+            url += 'dept/' + $el.data('deptId');
+        else if (selected == 'dept' && $el.data('deptField')) {
+            if (dept)
+                url += 'dept/' + dept
+            else
+                return inner.empty().parent().hide();
+        }
+        else if (type == 'none')
+           return inner.empty().parent().hide();
+        else
+            url += selected
+
+        inner.load(url).parent().show();
+    }
 };
 
 /* Redactor richtext init */
@@ -127,8 +191,9 @@ $(function() {
             // TODO: Rewrite the entire <img> tag. Otherwise the @width
             // and @height attributes will begin to accumulate
             before = img.outerHTML;
-            $(img).attr('width', img.clientWidth)
-                  .attr('height',img.clientHeight);
+            if (img.clientWidth && img.clientHeight)
+                $(img).attr('width', img.clientWidth)
+                      .attr('height',img.clientHeight);
             html = html.replace(before, img.outerHTML);
         });
         // Drop <inline> elements if found in the text (shady mojo happening
@@ -141,11 +206,16 @@ $(function() {
         var el = $(el),
             options = {
                 'air': el.hasClass('no-bar'),
-                'airButtons': ['formatting', '|', 'bold', 'italic', 'deleted', '|', 'unorderedlist', 'orderedlist', 'outdent', 'indent', '|', 'image'],
+                'airButtons': ['formatting', '|', 'bold', 'italic', 'underline', 'deleted', '|', 'unorderedlist', 'orderedlist', 'outdent', 'indent', '|', 'image'],
+                'buttons': ['html', '|', 'formatting', '|', 'bold',
+                    'italic', 'underline', 'deleted', '|', 'unorderedlist',
+                    'orderedlist', 'outdent', 'indent', '|', 'image', 'video',
+                    'file', 'table', 'link', '|', 'alignment', '|',
+                    'horizontalrule'],
                 'autoresize': !el.hasClass('no-bar'),
                 'minHeight': el.hasClass('small') ? 75 : 150,
                 'focus': false,
-                'plugins': ['fontcolor','fontfamily'],
+                'plugins': ['fontcolor','fontfamily', 'signature'],
                 'imageGetJson': 'ajax.php/draft/images/browse',
                 'syncBeforeCallback': captureImageSizes,
                 'linebreaks': true,

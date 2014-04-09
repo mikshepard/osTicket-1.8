@@ -39,18 +39,30 @@ function db_connect($host, $user, $passwd, $options = array()) {
         return NULL;
 
     $port = ini_get("mysqli.default_port");
+    $socket = ini_get("mysqli.default_socket");
+    $persistent = stripos($host, 'p:') === 0;
+    if ($persistent)
+        $host = substr($host, 2);
     if (strpos($host, ':') !== false) {
-        list($host, $port) = explode(':', $host);
+        list($host, $portspec) = explode(':', $host);
         // PHP may not honor the port number if connecting to 'localhost'
-        if (!strcasecmp($host, 'localhost'))
-            // XXX: Looks like PHP gethostbyname() is IPv4 only
-            $host = gethostbyname($host);
-        $port = (int) $port;
+        if ($portspec && is_numeric($portspec)) {
+            if (!strcasecmp($host, 'localhost'))
+                // XXX: Looks like PHP gethostbyname() is IPv4 only
+                $host = gethostbyname($host);
+            $port = (int) $portspec;
+        }
+        elseif ($portspec) {
+            $socket = $portspec;
+        }
     }
+
+    if ($persistent)
+        $host = 'p:' . $host;
 
     // Connect
     $start = microtime(true);
-    if (!@$__db->real_connect($host, $user, $passwd, null, $port))
+    if (!@$__db->real_connect($host, $user, $passwd, null, $port, $socket))
         return NULL;
 
     //Select the database, if any.
@@ -115,13 +127,38 @@ function db_create_database($database, $charset='utf8',
             $database, $charset, $collate));
 }
 
-// execute sql query
+/**
+ * Function: db_query
+ * Execute sql query
+ *
+ * Parameters:
+ * $query - (string) SQL query (with parameters)
+ * $logError - (mixed):
+ *      - (bool) true or false if error should be logged and alert email sent
+ *      - (callable) to receive error number and return true or false if
+ *      error should be logged and alert email sent. The callable is only
+ *      invoked if the query fails.
+ *
+ * Returns:
+ * (mixed) MysqliResource if SELECT query succeeds, true if an INSERT,
+ * UPDATE, or DELETE succeeds, false or null if the query fails.
+ */
 function db_query($query, $logError=true) {
     global $ost, $__db;
 
-    $res = $__db->query($query);
+    $tries = 3;
+    do {
+        $res = $__db->query($query);
+        // Retry the query due to deadlock error (#1213)
+        // TODO: Consider retry on #1205 (lock wait timeout exceeded)
+        // TODO: Log warning
+    } while (!$res && --$tries && $__db->errno == 1213);
 
     if(!$res && $logError && $ost) { //error reporting
+        // Allow $logError() callback to determine if logging is necessary
+        if (is_callable($logError) && !($logError($__db->errno)))
+            return $res;
+
         $msg='['.$query.']'."\n\n".db_error();
         $ost->logDBError('DB Error #'.db_errno(), $msg);
         //echo $msg; #uncomment during debuging or dev.
@@ -154,7 +191,7 @@ function db_result($res, $row=0) {
     return $value;
 }
 
-function db_fetch_array($res, $mode=MYSQL_ASSOC) {
+function db_fetch_array($res, $mode=MYSQLI_ASSOC) {
     return ($res) ? db_output($res->fetch_array($mode)) : NULL;
 }
 
@@ -227,7 +264,7 @@ function db_input($var, $quote=true) {
 
     if(is_array($var))
         return array_map('db_input', $var, array_fill(0, count($var), $quote));
-    elseif($var && preg_match("/^\d+(\.\d+)?$/", $var))
+    elseif($var && preg_match("/^(?:\d+\.\d+|[1-9]\d*)$/S", $var))
         return $var;
 
     return db_real_escape($var, $quote);

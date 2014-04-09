@@ -34,6 +34,10 @@ class Unpacker extends Module {
              main installation path.",
     );
 
+    function realpath($path) {
+        return ($p = realpath($path)) ? $p : $path;
+    }
+
     function find_upload_folder() {
         # Hop up to the root folder
         $start = dirname(__file__);
@@ -41,7 +45,7 @@ class Unpacker extends Module {
             if (is_dir($start . '/upload')) break;
             $start .= '/..';
         }
-        return realpath($start.'/upload');
+        return self::realpath($start.'/upload');
     }
 
     function change_include_dir($include_path) {
@@ -68,7 +72,7 @@ class Unpacker extends Module {
             }
         }
         if (!file_put_contents($bootstrap_php, implode("\n", $lines)))
-            die("Unable to configure location of INCLUDE_DIR in main.inc.php\n");
+            die("Unable to configure location of INCLUDE_DIR in bootstrap.php\n");
     }
 
     function exclude($pattern, $match) {

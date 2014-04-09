@@ -213,6 +213,7 @@ class AdminNav extends StaffNav{
                     $subnav[]=array('desc'=>'Pages', 'href'=>'pages.php','title'=>'Pages','iconclass'=>'pages');
                     $subnav[]=array('desc'=>'Forms','href'=>'forms.php','iconclass'=>'forms');
                     $subnav[]=array('desc'=>'Lists','href'=>'lists.php','iconclass'=>'lists');
+                    $subnav[]=array('desc'=>'Plugins','href'=>'plugins.php','iconclass'=>'api');
                     break;
                 case 'emails':
                     $subnav[]=array('desc'=>'Emails','href'=>'emails.php', 'title'=>'Email Addresses', 'iconclass'=>'emailSettings');
@@ -281,12 +282,13 @@ class UserNav {
             $navs['new']=array('desc'=>'Send&nbsp;A&nbsp;Message','href'=>'open.php','title'=>'');
             if($user && $user->isValid()) {
                 if($cfg && $cfg->showRelatedTickets()) {
+
                     $navs['tickets']=array('desc'=>sprintf('My&nbsp;Messages&nbsp;(%d)',$user->getNumTickets()),
                                            'href'=>'tickets.php',
                                             'title'=>'Show all tickets');
                 } else {
                     $navs['tickets']=array('desc'=>'View&nbsp;Message&nbsp;Thread',
-                                           'href'=>sprintf('tickets.php?id=%d',$user->getTicketID()),
+                                           'href'=>sprintf('tickets.php?id=%d',$user->getTicketId()),
                                            'title'=>'View ticket status');
                 }
             } else {

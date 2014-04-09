@@ -28,6 +28,7 @@ class mysqli_stmt {
 
 class ReflectionClass {
     function getMethods() {}
+    function getConstants() {}
 }
 
 class DomNode {
@@ -45,6 +46,7 @@ class DomElement {
 
 class DomDocument {
     function loadHTML() {}
+    function loadXML() {}
 }
 
 class Exception {
@@ -83,4 +85,17 @@ class DateTimeZone {
     static function listIdentifiers() {}
 }
 
+class Phar {
+    static function isValidPharFilename() {}
+}
+
+class ZipArchive {
+    function statIndex() {}
+    function getFromIndex() {}
+}
+
+class finfo {
+    function file() {}
+    function buffer() {}
+}
 ?>

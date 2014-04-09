@@ -20,6 +20,7 @@
 
 require_once(INCLUDE_DIR.'class.csrf.php'); //CSRF token class.
 require_once(INCLUDE_DIR.'class.migrater.php');
+require_once(INCLUDE_DIR.'class.plugin.php');
 
 define('LOG_WARN',LOG_WARNING);
 
@@ -46,6 +47,7 @@ class osTicket {
     var $session;
     var $csrf;
     var $company;
+    var $plugins;
 
     function osTicket() {
 
@@ -59,6 +61,8 @@ class osTicket {
         $this->csrf = new CSRF('__CSRFToken__');
 
         $this->company = new Company();
+
+        $this->plugins = new PluginManager();
     }
 
     function isSystemOnline() {
@@ -224,12 +228,11 @@ class osTicket {
     function alertAdmin($subject, $message, $log=false) {
 
         //Set admin's email address
-        if(!($to=$this->getConfig()->getAdminEmail()))
-            $to=ADMIN_EMAIL;
-
+        if (!($to = $this->getConfig()->getAdminEmail()))
+            $to = ADMIN_EMAIL;
 
         //append URL to the message
-        $message.="\n\n".THISPAGE;
+        $message.="\n\n".$this->getConfig()->getBaseUrl();
 
         //Try getting the alert email.
         $email=null;
@@ -398,7 +401,10 @@ class osTicket {
         $file = str_replace('\\','/', $frame['file']);
         $path = substr($file, strlen(ROOT_DIR));
         if($path && ($pos=strpos($_SERVER['SCRIPT_NAME'], $path))!==false)
-            return substr($_SERVER['SCRIPT_NAME'], 0, $pos);
+            return ($pos) ? substr($_SERVER['SCRIPT_NAME'], 0, $pos) : '/';
+
+        if (self::is_cli())
+            return '/';
 
         return null;
     }
@@ -431,6 +437,9 @@ class osTicket {
         //Set default time zone... user/staff settting will override it (on login).
         $_SESSION['TZ_OFFSET'] = $ost->getConfig()->getTZoffset();
         $_SESSION['TZ_DST'] = $ost->getConfig()->observeDaylightSaving();
+
+        // Bootstrap installed plugins
+        $ost->plugins->bootstrap();
 
         return $ost;
     }

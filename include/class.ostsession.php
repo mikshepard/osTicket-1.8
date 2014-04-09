@@ -18,6 +18,7 @@ class osTicketSession {
 
     var $ttl = SESSION_TTL;
     var $data = '';
+    var $data_hash = '';
     var $id = '';
 
     function osTicketSession($ttl=0){
@@ -25,7 +26,11 @@ class osTicketSession {
         if(!$this->ttl)
             $this->ttl=SESSION_TTL;
 
+        // Set osTicket specific session name.
         session_name('OSTSESSID');
+
+        // Forced cleanup on shutdown
+        register_shutdown_function('session_write_close');
 
         if (OsticketConfig::getDBVersion())
             return session_start();
@@ -55,8 +60,6 @@ class osTicketSession {
             array(&$this, 'destroy'),
             array(&$this, 'gc')
         );
-        //Forced cleanup.
-        register_shutdown_function('session_write_close');
 
         //Start the session.
         session_start();
@@ -87,11 +90,15 @@ class osTicketSession {
                 list($this->data)=db_fetch_row($res);
             $this->id = $id;
         }
+        $this->data_hash = md5($id.$this->data);
         return $this->data;
     }
 
     function write($id, $data){
         global $thisstaff;
+
+        if (md5($id.$data) == $this->data_hash)
+            return;
 
         $ttl = ($this && get_class($this) == 'osTicketSession')
             ? $this->getTTL() : SESSION_TTL;

@@ -100,30 +100,41 @@ class Mailer {
         $subject = preg_replace("/(\r\n|\r|\n)/s",'', trim($subject));
 
         /* Message ID - generated for each outgoing email */
-        $messageId = sprintf('<%s-%s>', Misc::randCode(16),
-                ($this->getEmail()?$this->getEmail()->getEmail():'@osTicketMailer'));
+        $messageId = sprintf('<%s-%s-%s>',
+            substr(md5('mail'.SECRET_SALT), -9),
+            Misc::randCode(9),
+            ($this->getEmail()?$this->getEmail()->getEmail():'@osTicketMailer'));
 
         $headers = array (
-                'From' => $this->getFromAddress(),
-                'To' => $to,
-                'Subject' => $subject,
-                'Date'=> date('D, d M Y H:i:s O'),
-                'Message-ID' => $messageId,
-                'X-Mailer' =>'osTicket Mailer'
-               );
+            'From' => $this->getFromAddress(),
+            'To' => $to,
+            'Subject' => $subject,
+            'Date'=> date('D, d M Y H:i:s O'),
+            'Message-ID' => $messageId,
+            'X-Mailer' =>'osTicket Mailer',
+        );
 
-        //Set bulk/auto-response headers.
-        if($options && ($options['autoreply'] or $options['bulk'])) {
+        if ($this->getEmail() instanceof Email)
+            $headers['Return-Path'] = $this->getEmail()->getEmail();
+
+        //Bulk.
+        if (isset($options['bulk']) && $options['bulk'])
+            $headers+= array('Precedence' => 'bulk');
+
+        //Auto-reply - mark as autoreply and supress all auto-replies
+        if (isset($options['autoreply']) && $options['autoreply']) {
             $headers+= array(
+                    'Precedence' => 'auto_reply',
                     'X-Autoreply' => 'yes',
-                    'X-Auto-Response-Suppress' => 'ALL, AutoReply',
+                    'X-Auto-Response-Suppress' => 'DR, RN, OOF, AutoReply',
                     'Auto-Submitted' => 'auto-replied');
-
-            if($options['bulk'])
-                $headers+= array('Precedence' => 'bulk');
-            else
-                $headers+= array('Precedence' => 'auto_reply');
         }
+
+        //Notice (sort of automated - but we don't want auto-replies back
+        if (isset($options['notice']) && $options['notice'])
+            $headers+= array(
+                    'X-Auto-Response-Suppress' => 'OOF, AutoReply',
+                    'Auto-Submitted' => 'auto-generated');
 
         if ($options) {
             if (isset($options['inreplyto']) && $options['inreplyto'])
@@ -139,25 +150,36 @@ class Mailer {
 
         $mime = new Mail_mime();
 
+        // If the message is not explicitly declared to be a text message,
+        // then assume that it needs html processing to create a valid text
+        // body
         $isHtml = true;
-        // Ensure that the 'text' option / hint is not set to true and that
-        // the message appears to be HTML -- that is, the first
-        // non-whitespace char is a '<' character
-        if (!(isset($options['text']) && $options['text'])
-                && (!$cfg || $cfg->isHtmlThreadEnabled())) {
+        $mid_token = (isset($options['thread']))
+            ? $options['thread']->asMessageId($to) : '';
+        if (!(isset($options['text']) && $options['text'])) {
+            if ($cfg->stripQuotedReply() && ($tag=$cfg->getReplySeparator())
+                    && (!isset($options['reply-tag']) || $options['reply-tag']))
+                $message = "<div style=\"display:none\"
+                    data-mid=\"$mid_token\">$tag<br/><br/></div>$message";
             // Make sure nothing unsafe has creeped into the message
             $message = Format::safe_html($message); //XXX??
-            $mime->setTXTBody(Format::html2text($message, 90, false));
+            $txtbody = rtrim(Format::html2text($message, 90, false))
+                . ($mid_token ? "\nRef-Mid: $mid_token\n" : '');
+            $mime->setTXTBody($txtbody);
         }
         else {
             $mime->setTXTBody($message);
             $isHtml = false;
         }
 
-        $domain = 'local';
         if ($isHtml && $cfg && $cfg->isHtmlThreadEnabled()) {
-            // TODO: Lookup helpdesk domain
-            $domain = substr(md5($ost->getConfig()->getURL()), -12);
+            // Pick a domain compatible with pear Mail_Mime
+            $matches = array();
+            if (preg_match('#(@[0-9a-zA-Z\-\.]+)#', $this->getFromAddress(), $matches)) {
+                $domain = $matches[1];
+            } else {
+                $domain = '@localhost';
+            }
             // Format content-ids with the domain, and add the inline images
             // to the email attachment list
             $self = $this;
@@ -167,10 +189,10 @@ class Mailer {
                         return $match[0];
                     $mime->addHTMLImage($file->getData(),
                         $file->getType(), $file->getName(), false,
-                        $file->getHash().'@'.$domain);
+                        $match[1].$domain);
                     // Don't re-attach the image below
                     unset($self->attachments[$file->getId()]);
-                    return $match[0].'@'.$domain;
+                    return $match[0].$domain;
                 }, $message);
             // Add an HTML body
             $mime->setHTMLBody($message);
@@ -199,20 +221,37 @@ class Mailer {
         $body = $mime->get($encodings);
         //encode the headers.
         $headers = $mime->headers($headers, true);
+
+        // Cache smtp connections made during this request
+        static $smtp_connections = array();
         if(($smtp=$this->getSMTPInfo())) { //Send via SMTP
-            $mail = mail::factory('smtp',
-                    array ('host' => $smtp['host'],
-                           'port' => $smtp['port'],
-                           'auth' => $smtp['auth'],
-                           'username' => $smtp['username'],
-                           'password' => $smtp['password'],
-                           'timeout'  => 20,
-                           'debug' => false,
-                           ));
+            $key = sprintf("%s:%s:%s", $smtp['host'], $smtp['port'],
+                $smtp['username']);
+            if (!isset($smtp_connections[$key])) {
+                $mail = mail::factory('smtp', array(
+                    'host' => $smtp['host'],
+                    'port' => $smtp['port'],
+                    'auth' => $smtp['auth'],
+                    'username' => $smtp['username'],
+                    'password' => $smtp['password'],
+                    'timeout'  => 20,
+                    'debug' => false,
+                    'persist' => true,
+                ));
+                if ($mail->connect())
+                    $smtp_connections[$key] = $mail;
+            }
+            else {
+                // Use persistent connection
+                $mail = $smtp_connections[$key];
+            }
 
             $result = $mail->send($to, $headers, $body);
             if(!PEAR::isError($result))
                 return $messageId;
+
+            // Force reconnect on next ->send()
+            unset($smtp_connections[$key]);
 
             $alert=sprintf("Unable to email via SMTP:%s:%d [%s]\n\n%s\n",
                     $smtp['host'], $smtp['port'], $smtp['username'], $result->getMessage());

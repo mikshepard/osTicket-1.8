@@ -3,6 +3,7 @@ $title=($cfg && is_object($cfg) && $cfg->getTitle())?$cfg->getTitle():'osTicket 
 header("Content-Type: text/html; charset=UTF-8\r\n");
 ?>
 <!DOCTYPE html>
+<html>
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
@@ -43,8 +44,9 @@ header("Content-Type: text/html; charset=UTF-8\r\n");
             <p>
              <?php
              if($thisclient && is_object($thisclient) && $thisclient->isValid()) {
-                 echo Format::htmlchars($thisclient->getName()).'&nbsp;-&nbsp;';
+                 echo Format::htmlchars($thisclient->getName()).'&nbsp;|';
                  ?>
+                <a href="<?php echo ROOT_PATH; ?>profile.php">Profile</a> |
                 <?php
                 if($cfg->showRelatedTickets()) {?>
                 <a href="<?php echo ROOT_PATH; ?>tickets.php">My Messages <b>(<?php echo $thisclient->getNumTickets(); ?>)</b></a> -
@@ -53,7 +55,7 @@ header("Content-Type: text/html; charset=UTF-8\r\n");
                 <a href="<?php echo ROOT_PATH; ?>logout.php?auth=<?php echo $ost->getLinkToken(); ?>">Log Out</a>
              <?php
              }elseif($nav){ ?>
-                 Guest User - <a href="<?php echo ROOT_PATH; ?>login.php">Log In</a>
+                 Guest User | <a href="<?php echo ROOT_PATH; ?>login.php">Log In</a>
               <?php
              } ?>
             </p>

@@ -89,6 +89,7 @@ class Bootstrap {
         define('TICKET_LOCK_TABLE',$prefix.'ticket_lock');
         define('TICKET_EVENT_TABLE',$prefix.'ticket_event');
         define('TICKET_EMAIL_INFO_TABLE',$prefix.'ticket_email_info');
+        define('TICKET_COLLABORATOR_TABLE', $prefix.'ticket_collaborator');
         define('TICKET_PRIORITY_TABLE',$prefix.'ticket_priority');
         define('PRIORITY_TABLE',TICKET_PRIORITY_TABLE);
 
@@ -110,6 +111,8 @@ class Bootstrap {
 
         define('FILTER_TABLE', $prefix.'filter');
         define('FILTER_RULE_TABLE', $prefix.'filter_rule');
+
+        define('PLUGIN_TABLE', $prefix.'plugin');
 
         define('API_KEY_TABLE',$prefix.'api_key');
         define('TIMEZONE_TABLE',$prefix.'timezone');
@@ -169,13 +172,13 @@ class Bootstrap {
 
     function loadCode() {
         #include required files
-        require(INCLUDE_DIR.'class.ostsession.php');
-        require(INCLUDE_DIR.'class.usersession.php');
+        require(INCLUDE_DIR.'class.signal.php');
+        require(INCLUDE_DIR.'class.auth.php');
         require(INCLUDE_DIR.'class.pagenate.php'); //Pagenate helper!
         require(INCLUDE_DIR.'class.log.php');
         require(INCLUDE_DIR.'class.crypto.php');
         require(INCLUDE_DIR.'class.timezone.php');
-        require(INCLUDE_DIR.'class.signal.php');
+        require_once(INCLUDE_DIR.'class.signal.php');
         require(INCLUDE_DIR.'class.nav.php');
         require(INCLUDE_DIR.'class.page.php');
         require_once(INCLUDE_DIR.'class.format.php'); //format helpers
@@ -196,9 +199,18 @@ class Bootstrap {
                     return iconv($from, $to, $str); }
             }
             else {
-                function mb_strpos($a, $b) { return strpos($a, $b); }
-                function mb_strlen($str) { return strlen($str); }
-                function mb_substr($a, $b, $c=null) { return substr($a, $b, $c); }
+                function mb_strpos($a, $b) {
+                    $c = preg_replace('/^(\X*)'.preg_quote($b).'.*$/us', '$1', $a);
+                    return ($c===$a) ? false : mb_strlen($c);
+                }
+                function mb_strlen($str) {
+                    $a = array();
+                    return preg_match_all('/\X/u', $str, $a);
+                }
+                function mb_substr($a, $b, $c=null) {
+                    return preg_replace(
+                        "/^\X{{$b}}(\X".($c ? "{{$c}}" : "*").").*/us",'$1',$a);
+                }
                 function mb_convert_encoding($str, $to, $from='utf-8') {
                     if (strcasecmp($to, $from) == 0)
                         return $str;
@@ -261,7 +273,11 @@ class Bootstrap {
 }
 
 #Get real path for root dir ---linux and windows
-define('ROOT_DIR',str_replace('\\', '/', realpath(dirname(__FILE__))).'/');
+$here = dirname(__FILE__);
+$here = ($h = realpath($here)) ? $h : $here;
+define('ROOT_DIR',str_replace('\\', '/', $here.'/'));
+unset($here); unset($h);
+
 define('INCLUDE_DIR',ROOT_DIR.'include/'); //Change this if include is moved outside the web path.
 define('PEAR_DIR',INCLUDE_DIR.'pear/');
 define('SETUP_DIR',ROOT_DIR.'setup/');

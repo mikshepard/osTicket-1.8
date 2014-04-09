@@ -15,7 +15,7 @@
 **********************************************************************/
 if(!strcasecmp(basename($_SERVER['SCRIPT_NAME']),basename(__FILE__))) die('kwaheri rafiki!');
 
-$thisdir=str_replace('\\', '/', realpath(dirname(__FILE__))).'/';
+$thisdir=str_replace('\\', '/', dirname(__FILE__)).'/';
 if(!file_exists($thisdir.'main.inc.php')) die('Fatal Error.');
 
 require_once($thisdir.'main.inc.php');
@@ -43,11 +43,9 @@ require_once(INCLUDE_DIR.'class.dept.php');
 //clear some vars
 $errors=array();
 $msg='';
-$thisclient=$nav=null;
+$nav=null;
 //Make sure the user is valid..before doing anything else.
-if($_SESSION['_client']['userID'] && $_SESSION['_client']['key'])
-    $thisclient = new ClientSession($_SESSION['_client']['userID'],$_SESSION['_client']['key']);
-
+$thisclient = UserAuthenticationBackend::getUser();
 //is the user logged in?
 if($thisclient && $thisclient->getId() && $thisclient->isValid()){
      $thisclient->refreshSession();

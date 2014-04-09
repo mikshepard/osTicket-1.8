@@ -86,7 +86,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
             </td>
             <td>
                 <select name="tpl_id">
-                    <option value="0">&mdash; System default &mdash;</option>
+                    <option value="0">&mdash; System Default &mdash;</option>
                     <?php
                     $sql='SELECT tpl_id,name FROM '.EMAIL_TEMPLATE_GRP_TABLE.' tpl WHERE isactive=1 ORDER by name';
                     if(($res=db_query($sql)) && db_num_rows($res)){
@@ -106,7 +106,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
             </td>
             <td>
                 <select name="sla_id">
-                    <option value="0">&mdash; System default &mdash;</option>
+                    <option value="0">&mdash; System Default &mdash;</option>
                     <?php
                     if($slas=SLA::getSLAs()) {
                         foreach($slas as $id =>$name) {
@@ -119,8 +119,6 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                 &nbsp;<span class="error">*&nbsp;<?php echo $errors['sla_id']; ?></span>
             </td>
         </tr>
-        <?php
-        if($dept && $dept->getNumUsers()){ ?>
         <tr>
             <td width="180" class="required">
                 Manager:
@@ -128,12 +126,11 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
             <td>
                 <select name="manager_id">
                     <option value="0">&mdash; None &mdash;</option>
-                    <option value="0" disabled="disabled">Select Department Manager (Optional)</option>
                     <?php
                     $sql='SELECT staff_id,CONCAT_WS(", ",lastname, firstname) as name '
                         .' FROM '.STAFF_TABLE.' staff '
                         .' ORDER by name';
-                    if(($res=db_query($sql)) && db_num_rows($res)){
+                    if(($res=db_query($sql)) && db_num_rows($res)) {
                         while(list($id,$name)=db_fetch_row($res)){
                             $selected=($info['manager_id'] && $id==$info['manager_id'])?'selected="selected"':'';
                             echo sprintf('<option value="%d" %s>%s</option>',$id,$selected,$name);
@@ -144,9 +141,6 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                 &nbsp;<span class="error">&nbsp;<?php echo $errors['manager_id']; ?></span>
             </td>
         </tr>
-        <?php
-        } ?>
-
         <tr>
             <td width="180">
                 Group Membership:
@@ -182,12 +176,11 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
         </tr>
         <tr>
             <td width="180">
-                Auto Response Email:
+                Auto-Response Email:
             </td>
             <td>
                 <select name="autoresp_email_id">
-                    <option value=""  disabled="disabled">Select Outgoing  Email</option>
-                    <option value="0">&mdash; Department Email (Above) &mdash;</option>
+                    <option value="0" selected="selected">&mdash; Department Email &mdash;</option>
                     <?php
                     $sql='SELECT email_id,email,name FROM '.EMAIL_TABLE.' email ORDER by name';
                     if(($res=db_query($sql)) && db_num_rows($res)){

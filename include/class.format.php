@@ -30,32 +30,28 @@ class Format {
         return round(($bytes/1048576),1).' mb';
     }
 
-    function file_name($filename) {
-        return preg_replace('/\s+/', '_', $filename);
-    }
-
     /* encode text into desired encoding - taking into accout charset when available. */
     function encode($text, $charset=null, $encoding='utf-8') {
 
         //Try auto-detecting charset/encoding
-        if(!$charset && function_exists('mb_detect_encoding'))
+        if (!$charset && function_exists('mb_detect_encoding'))
             $charset = mb_detect_encoding($text);
 
         // Cleanup - incorrect, bogus, or ambiguous charsets
-        if($charset && in_array(strtolower(trim($charset)),
+        // ISO-8859-1 is assumed for empty charset.
+        if (!$charset || in_array(strtolower(trim($charset)),
                 array('default','x-user-defined','iso','us-ascii')))
             $charset = 'ISO-8859-1';
 
-        if ($charset && strcasecmp($charset, $encoding) === 0)
-            return $text;
-
         $original = $text;
-        if(function_exists('iconv') && $charset)
+        if (function_exists('iconv'))
             $text = iconv($charset, $encoding.'//IGNORE', $text);
-        elseif(function_exists('mb_convert_encoding') && $charset && $encoding)
+        elseif (function_exists('mb_convert_encoding'))
             $text = mb_convert_encoding($text, $encoding, $charset);
-        elseif(!strcasecmp($encoding, 'utf-8')) //forced blind utf8 encoding.
-            $text = function_exists('imap_utf8')?imap_utf8($text):utf8_encode($text);
+        elseif (!strcasecmp($encoding, 'utf-8')
+                && function_exists('utf8_encode')
+                && !strcasecmp($charset, 'ISO-8859-1'))
+            $text = utf8_encode($text);
 
         // If $text is false, then we have a (likely) invalid charset, use
         // the original text and assume 8-bit (latin-1 / iso-8859-1)
@@ -149,7 +145,7 @@ class Format {
 
         # See if advanced html2text is available (requires xml extension)
         if (function_exists('convert_html_to_text')
-                && extension_loaded('xml'))
+                && extension_loaded('dom'))
             return convert_html_to_text($html, $width);
 
         # Try simple html2text  - insert line breaks after new line tags.
@@ -183,7 +179,7 @@ class Format {
         if (isset($attributes['style'])) {
             $styles = explode(';', $attributes['style']);
             foreach ($styles as $i=>$s) {
-                list($prop, $val) = explode(':', $s);
+                @list($prop, $val) = explode(':', $s);
                 if (!$val || !$prop || $prop[0] == '-')
                     unset($styles[$i]);
             }
@@ -206,11 +202,12 @@ class Format {
     function safe_html($html) {
         // Remove HEAD and STYLE sections
         $html = preg_replace(
-            array(':<(head|style|script).+</\1>:is',   # <head> and <style> sections
+            array(':<(head|style|script).+?</\1>:is', # <head> and <style> sections
                   ':<!\[[^]<]+\]>:',            # <![if !mso]> and friends
                   ':<!DOCTYPE[^>]+>:',          # <!DOCTYPE ... >
+                  ':<\?[^>]+>:',                # <?xml version="1.0" ... >
             ),
-            array('', '', ''),
+            array('', '', '', ''),
             $html);
         $config = array(
             'safe' => 1, //Exclude applet, embed, iframe, object and script tags.
@@ -221,7 +218,7 @@ class Format {
             'schemes' => 'href: aim, feed, file, ftp, gopher, http, https, irc, mailto, news, nntp, sftp, ssh, telnet; *:file, http, https; src: cid, http, https, data',
             'hook_tag' => function($e, $a=0) { return Format::__html_cleanup($e, $a); },
             'elements' => '*+iframe',
-            'spec' => 'iframe=-*,height,width,type,src(match="`^(https?:)?//(www\.)?(youtube|dailymotion|vimeo)\.com/`i"),frameborder;',
+            'spec' => 'iframe=-*,height,width,type,src(match="`^(https?:)?//(www\.)?(youtube|dailymotion|vimeo)\.com/`i"),frameborder; div=data-mid',
         );
 
         return Format::html($html, $config);
@@ -313,23 +310,28 @@ class Format {
         $text = preg_replace_callback(':^[^<]+|>[^<]+:',
             function($match) use ($token) {
                 // Scan for things that look like URLs
-                $links = preg_replace_callback(
-                    '`(?<!>)(((f|ht)tp(s?)://|(?<!//)www\.)([a-zA-Z0-9_-]+(\.|/|$))+\S*)`',
+                return preg_replace_callback(
+                    '`(?<!>)(((f|ht)tp(s?)://|(?<!//)www\.)([-+~%/.\w]+)(?:[-?#+=&;%@.\w]*)?)'
+                   .'|(\b[_\.0-9a-z-]+@([0-9a-z][0-9a-z-]+\.)+[a-z]{2,4})`',
                     function ($match) use ($token) {
-                        if (in_array(substr($match[1], -1),
-                                array(',','.','?','!',':',';'))) {
-                            $match[7] = substr($match[1], -1);
-                            $match[1] = substr($match[1], 0, strlen($match[1])-1);
+                        if ($match[1]) {
+                            while (in_array(substr($match[1], -1),
+                                    array('.','?','-',':',';'))) {
+                                $match[9] = substr($match[1], -1) . $match[9];
+                                $match[1] = substr($match[1], 0, strlen($match[1])-1);
+                            }
+                            if (strpos($match[2], '//') === false) {
+                                $match[1] = 'http://' . $match[1];
+                            }
+                            return '<a href="l.php?url='.urlencode($match[1])
+                                .sprintf('&auth=%s" target="_blank">', $token)
+                                .$match[1].'</a>'.$match[9];
+                        } elseif ($match[6]) {
+                            return sprintf('<a href="mailto:%1$s" target="_blank">%1$s</a>',
+                                $match[6]);
                         }
-                        return '<a href="l.php?url='.urlencode($match[1])
-                            .sprintf('&auth=%s" target="_blank">', $token)
-                            .$match[1].'</a>'.$match[7];
                     },
                     $match[0]);
-                // Now change email addresses to links with mailto: scheme
-                return preg_replace(
-                    '/(\b[_\.0-9a-z-]+@([0-9a-z][0-9a-z-]+\.)+[a-z]{2,4})/',
-                    '<a href="mailto:\\1" target="_blank">\\1</a>', $links);
             },
             $text);
 
@@ -341,6 +343,7 @@ class Format {
                     'hr'=>1, 'img'=>1, 'input'=>1, 'isindex'=>1, 'param'=>1);
                 if ($e == 'a' && $a) {
                     if (isset($a['href'])
+                            && strpos($a['href'], 'mailto:') !== 0
                             && strpos($a['href'], 'l.php?') === false)
                         $a['href'] = 'l.php?url='.urlencode($a['href'])
                             .'&amp;auth='.$token;
@@ -380,12 +383,8 @@ class Format {
     }
 
 
-    function linebreaks($string) {
-        return urldecode(ereg_replace("%0D", " ", urlencode($string)));
-    }
-
     function viewableImages($html, $script='image.php') {
-        return preg_replace_callback('/"cid:([\\w.-]{32})"/',
+        return preg_replace_callback('/"cid:([\w._-]{32})"/',
         function($match) use ($script) {
             $hash = $match[1];
             if (!($file = AttachmentFile::lookup($hash)))

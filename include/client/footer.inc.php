@@ -19,6 +19,6 @@
 <div id="loading">
     <h4>Please Wait!</h4>
     <p>Please wait... it will take a second!</p>
-</div>    
+</div>
 </body>
-</html>  
+</html>

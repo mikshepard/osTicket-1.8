@@ -24,32 +24,32 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
     <tbody>
         <tr>
             <th colspan="2">
-                <em><strong>Client Information</strong>: </em>
+                <em><strong>User Information</strong>: </em>
             </th>
         </tr>
         <?php
         if ($user) { ?>
-        <tr><td>Client:</td><td>
-            <div id="client-info">
+        <tr><td>User:</td><td>
+            <div id="user-info">
                 <input type="hidden" name="uid" id="uid" value="<?php echo $user->getId(); ?>" />
             <a href="#" onclick="javascript:
                 $.userLookup('ajax.php/users/<?php echo $user->getId(); ?>/edit',
                         function (user) {
-                            $('#client-name').text(user.name);
-                            $('#client-email').text(user.email);
+                            $('#user-name').text(user.name);
+                            $('#user-email').text(user.email);
                         });
                 return false;
                 "><i class="icon-user"></i>
-                <span id="client-name"><?php echo $user->getName(); ?></span>
-                &lt;<span id="client-email"><?php echo $user->getEmail(); ?></span>&gt;
+                <span id="user-name"><?php echo $user->getName(); ?></span>
+                &lt;<span id="user-email"><?php echo $user->getEmail(); ?></span>&gt;
                 </a>
                 <a class="action-button" style="float:none;overflow:inherit" href="#"
                     onclick="javascript:
                         $.userLookup('ajax.php/users/select/'+$('input#uid').val(),
                             function(user) {
                                 $('input#uid').val(user.id);
-                                $('#client-name').text(user.name);
-                                $('#client-email').text('<'+user.email+'>');
+                                $('#user-name').text(user.name);
+                                $('#user-email').text('<'+user.email+'>');
                         });
                         return false;
                 "><i class="icon-edit"></i> Change</a>
@@ -66,7 +66,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                         autocomplete="off" autocorrect="off" value="<?php echo $info['email']; ?>" /> </span>
                 <font class="error">* <?php echo $errors['email']; ?></font>
             </td>
-        </td>
+        </tr>
         <tr>
             <td width="160" class="required"> Full Name: </td>
             <td>
@@ -74,7 +74,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                     <input type="text" size=45 name="name" id="user-name" value="<?php echo $info['name']; ?>" /> </span>
                 <font class="error">* <?php echo $errors['name']; ?></font>
             </td>
-        </td>
+        </tr>
         <?php
         } ?>
 
@@ -101,8 +101,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
             </td>
             <td>
                 <select name="source">
-                    <option value="" selected >&mdash; Select Source &mdash;</option>
-                    <option value="Phone" <?php echo ($info['source']=='Phone')?'selected="selected"':''; ?>>Phone</option>
+                    <option value="Phone" <?php echo ($info['source']=='Phone')?'selected="selected"':''; ?> selected="selected">Phone</option>
                     <option value="Email" <?php echo ($info['source']=='Email')?'selected="selected"':''; ?>>Email</option>
                     <option value="Other" <?php echo ($info['source']=='Other')?'selected="selected"':''; ?>>Other</option>
                 </select>
@@ -111,6 +110,37 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
         </tr>
         <tr>
             <td width="160" class="required">
+                Help Topic:
+            </td>
+            <td>
+                <select name="topicId" onchange="javascript:
+                        $('#dynamic-form').load(
+                            'ajax.php/form/help-topic/' + this.value);
+                        ">
+                    <?php
+                    if ($topics=Topic::getHelpTopics()) {
+                        if (count($topics) == 1)
+                            $selected = 'selected="selected"';
+                        else { ?>
+                <option value="" selected >&mdash; Select Help Topic &mdash;</option>
+<?php                   }
+                        foreach($topics as $id =>$name) {
+                            echo sprintf('<option value="%d" %s %s>%s</option>',
+                                $id, ($info['topicId']==$id)?'selected="selected"':'',
+                                $selected, $name);
+                        }
+                        if (count($topics) == 1 && !$form) {
+                            $T = Topic::lookup($id);
+                            $form = DynamicForm::lookup($T->ht['form_id']);
+                        }
+                    }
+                    ?>
+                </select>
+                &nbsp;<font class="error"><b>*</b>&nbsp;<?php echo $errors['topicId']; ?></font>
+            </td>
+        </tr>
+        <tr>
+            <td width="160">
                 Department:
             </td>
             <td>
@@ -125,32 +155,10 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                     }
                     ?>
                 </select>
-                &nbsp;<font class="error"><b>*</b>&nbsp;<?php echo $errors['deptId']; ?></font>
+                &nbsp;<font class="error"><?php echo $errors['deptId']; ?></font>
             </td>
         </tr>
 
-        <tr>
-            <td width="160" class="required">
-                Help Topic:
-            </td>
-            <td>
-                <select name="topicId" onchange="javascript:
-                        $('#dynamic-form').load(
-                            'ajax.php/form/help-topic/' + this.value);
-                        ">
-                    <option value="" selected >&mdash; Select Help Topic &mdash;</option>
-                    <?php
-                    if($topics=Topic::getHelpTopics()) {
-                        foreach($topics as $id =>$name) {
-                            echo sprintf('<option value="%d" %s>%s</option>',
-                                    $id, ($info['topicId']==$id)?'selected="selected"':'',$name);
-                        }
-                    }
-                    ?>
-                </select>
-                &nbsp;<font class="error"><b>*</b>&nbsp;<?php echo $errors['topicId']; ?></font>
-            </td>
-        </tr>
          <tr>
             <td width="160">
                 SLA Plan:
@@ -221,23 +229,23 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                 </select>&nbsp;<span class='error'>&nbsp;<?php echo $errors['assignId']; ?></span>
             </td>
         </tr>
-        <?php
-        }
-        $tform = TicketForm::getInstance()->getForm($_POST);
-        if ($_POST) $tform->isValid();
-        $tform->render(true);
-        ?>
+        <?php } ?>
         </tbody>
         <tbody id="dynamic-form">
         <?php
             if ($form) $form->getForm()->render(true);
         ?>
         </tbody>
+        <tbody> <?php
+        $tform = TicketForm::getInstance()->getForm($_POST);
+        if ($_POST) $tform->isValid();
+        $tform->render(true);
+        ?>
+        </tbody>
         <tbody>
         <?php
         //is the user allowed to post replies??
-        if($thisstaff->canPostReply()) {
-            ?>
+        if($thisstaff->canPostReply()) { ?>
         <tr>
             <th colspan="2">
                 <em><strong>Response</strong>: Optional response to the above issue.</em>
@@ -262,9 +270,15 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                     <label><input type='checkbox' value='1' name="append" id="append" checked="checked">Append</label>
                 </div>
             <?php
-            } ?>
+            }
+                $signature = '';
+                if ($thisstaff->getDefaultSignatureType() == 'mine')
+                    $signature = $thisstaff->getSignature(); ?>
                 <textarea class="richtext ifhtml draft draft-delete"
                     data-draft-namespace="ticket.staff.response"
+                    data-signature="<?php
+                        echo Format::htmlchars(Format::viewableImages($signature)); ?>"
+                    data-signature-field="signature" data-dept-field="deptId"
                     placeholder="Intial response for the ticket"
                     name="response" id="response" cols="21" rows="8"
                     style="width:80%;"><?php echo $info['response']; ?></textarea>
@@ -278,7 +292,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                             if($info['cannedattachments']) {
                                 foreach($info['cannedattachments'] as $k=>$id) {
                                     if(!($file=AttachmentFile::lookup($id))) continue;
-                                    $hash=$file->getHash().md5($file->getId().session_id().$file->getHash());
+                                    $hash=$file->getKey().md5($file->getId().session_id().$file->getKey());
                                     echo sprintf('<label><input type="checkbox" name="cannedattachments[]"
                                             id="f%d" value="%d" checked="checked"
                                             <a href="file.php?h=%s">%s</a>&nbsp;&nbsp;</label>&nbsp;',
@@ -373,6 +387,15 @@ $(function() {
         property: "/bin/true"
     });
 
+   <?php
+    // Popup user lookup on the initial page load (not post) if we don't have a
+    // user selected
+    if (!$_POST && !$user) {?>
+    $.userLookup('ajax.php/users/lookup/form', function (user) {
+        window.location.href = window.location.href+'&uid='+user.id;
+     });
+    <?php
+    } ?>
 });
 </script>
 
