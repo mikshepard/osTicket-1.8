@@ -115,7 +115,7 @@ class StaffNav {
                     $subnav[]=array('desc'=>'Tickets','href'=>'tickets.php','iconclass'=>'Ticket', 'droponly'=>true);
                     if($staff) {
                         if(($assigned=$staff->getNumAssignedTickets()))
-                            $subnav[]=array('desc'=>"My&nbsp;Tickets ($assigned)",
+                            $subnav[]=array('desc'=>"My&nbsp;Messages ($assigned)",
                                             'href'=>'tickets.php?status=assigned',
                                             'iconclass'=>'assignedTickets',
                                             'droponly'=>true);
@@ -274,23 +274,23 @@ class UserNav {
 
             $navs = array();
             $user = $this->user;
-            $navs['home']=array('desc'=>'Support&nbsp;Center&nbsp;Home','href'=>'index.php','title'=>'');
+            $navs['home']=array('desc'=>'Message&nbsp;Center&nbsp;Home','href'=>'index.php','title'=>'');
             if($cfg && $cfg->isKnowledgebaseEnabled())
                 $navs['kb']=array('desc'=>'Knowledgebase','href'=>'kb/index.php','title'=>'');
 
-            $navs['new']=array('desc'=>'Open&nbsp;New&nbsp;Ticket','href'=>'open.php','title'=>'');
+            $navs['new']=array('desc'=>'Send&nbsp;A&nbsp;Message','href'=>'open.php','title'=>'');
             if($user && $user->isValid()) {
                 if($cfg && $cfg->showRelatedTickets()) {
-                    $navs['tickets']=array('desc'=>sprintf('My&nbsp;Tickets&nbsp;(%d)',$user->getNumTickets()),
+                    $navs['tickets']=array('desc'=>sprintf('My&nbsp;Messages&nbsp;(%d)',$user->getNumTickets()),
                                            'href'=>'tickets.php',
                                             'title'=>'Show all tickets');
                 } else {
-                    $navs['tickets']=array('desc'=>'View&nbsp;Ticket&nbsp;Thread',
+                    $navs['tickets']=array('desc'=>'View&nbsp;Message&nbsp;Thread',
                                            'href'=>sprintf('tickets.php?id=%d',$user->getTicketID()),
                                            'title'=>'View ticket status');
                 }
             } else {
-                $navs['status']=array('desc'=>'Check Ticket Status','href'=>'view.php','title'=>'');
+                $navs['status']=array('desc'=>'View Message Archive','href'=>'view.php','title'=>'');
             }
             $this->navs=$navs;
         }

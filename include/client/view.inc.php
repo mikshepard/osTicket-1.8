@@ -13,7 +13,7 @@ if(!$dept || !$dept->isPublic())
     <tr>
         <td colspan="2" width="100%">
             <h1>
-                Ticket #<?php echo $ticket->getExtId(); ?> &nbsp;
+                Message #<?php echo $ticket->getExtId(); ?> &nbsp;
                 <a href="view.php?id=<?php echo $ticket->getExtId(); ?>" title="Reload"><span class="Icon refresh">&nbsp;</span></a>
             </h1>
         </td>
@@ -22,7 +22,7 @@ if(!$dept || !$dept->isPublic())
         <td width="50%">
             <table class="infoTable" cellspacing="1" cellpadding="3" width="100%" border="0">
                 <tr>
-                    <th width="100">Ticket Status:</th>
+                    <th width="100">Message Status:</th>
                     <td><?php echo ucfirst($ticket->getStatus()); ?></td>
                 </tr>
                 <tr>
@@ -80,7 +80,7 @@ foreach (DynamicFormEntry::forTicket($ticket->getId()) as $idx=>$form) {
 <br>
 <h2>Subject:<?php echo Format::htmlchars($ticket->getSubject()); ?></h2>
 <br>
-<span class="Icon thread">Ticket Thread</span>
+<span class="Icon thread">Message Thread</span>
 <div id="ticketThread">
 <?php
 if($ticket->getThreadCount() && ($thread=$ticket->getClientThread())) {

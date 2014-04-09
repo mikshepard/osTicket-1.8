@@ -9,8 +9,8 @@ if($thisclient && $thisclient->isValid()) {
 
 $info=($_POST && $errors)?Format::htmlchars($_POST):$info;
 ?>
-<h1>Open a New Ticket</h1>
-<p>Please fill in the form below to open a new ticket.</p>
+<h1>Message Form</h1>
+<p>Please fill in the form below and a Customer Service Representative will contact you shortly.</p>
 <form id="ticketForm" method="post" action="open.php" enctype="multipart/form-data">
   <?php csrf_token(); ?>
   <input type="hidden" name="a" value="open">
@@ -80,7 +80,7 @@ $info=($_POST && $errors)?Format::htmlchars($_POST):$info;
     </tbody>
   </table>
   <p style="padding-left:150px;">
-        <input type="submit" value="Create Ticket">
+        <input type="submit" value="Send Message">
         <input type="reset" value="Reset">
         <input type="button" value="Cancel" onClick='window.location.href="index.php"'>
   </p>

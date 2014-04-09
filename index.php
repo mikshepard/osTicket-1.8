@@ -1,4 +1,8 @@
 <?php
+$msie = strpos($_SERVER["HTTP_USER_AGENT"], 'MSIE') ? true : false;
+$firefox = strpos($_SERVER["HTTP_USER_AGENT"], 'Firefox') ? true : false;
+$safari = strpos($_SERVER["HTTP_USER_AGENT"], 'Safari') ? true : false;
+$chrome = strpos($_SERVER["HTTP_USER_AGENT"], 'Chrome') ? true : false;
 /*********************************************************************
     index.php
 
@@ -13,6 +17,7 @@
 
     vim: expandtab sw=4 ts=4 sts=4:
 **********************************************************************/
+header('P3P:CP="IDC DSP COR ADM DEVi TAIi PSA PSD IVAi IVDi CONi HIS OUR IND CNT"');
 require('client.inc.php');
 $section = 'home';
 require(CLIENTINC_DIR.'header.inc.php');
@@ -22,23 +27,23 @@ require(CLIENTINC_DIR.'header.inc.php');
     if($cfg && ($page = $cfg->getLandingPage()))
         echo $page->getBody();
     else
-        echo  '<h1>Welcome to the Support Center</h1>';
+        echo  '<h1>Welcome to the Motion RC Message Center</h1>';
     ?>
     <div id="new_ticket">
-        <h3>Open A New Ticket</h3>
+        <h3>Send Us A Message</h3>
         <br>
-        <div>Please provide as much detail as possible so we can best assist you. To update a previously submitted ticket, please login.</div>
+        <div>Click the button below to send us an e-mail message. To update a previously submitted message, please login.</div>
         <p>
-            <a href="open.php" class="green button">Open a New Ticket</a>
+            <a href="open.php" class="green button">Send Us an E-Mail</a>
         </p>
     </div>
 
     <div id="check_status">
-        <h3>Check Ticket Status</h3>
+        <h3>Message Archive</h3>
         <br>
-        <div>We provide archives and history of all your current and past support requests complete with responses.</div>
+        <div>Click the button below to view an archive of your current and past communications complete with responses.</div>
         <p>
-            <a href="view.php" class="blue button">Check Ticket Status</a>
+            <a href="view.php" class="blue button">View Messages</a>
         </p>
     </div>
 </div>
@@ -47,7 +52,7 @@ require(CLIENTINC_DIR.'header.inc.php');
 if($cfg && $cfg->isKnowledgebaseEnabled()){
     //FIXME: provide ability to feature or select random FAQs ??
 ?>
-<p>Be sure to browse our <a href="kb/index.php">Frequently Asked Questions (FAQs)</a>, before opening a ticket.</p>
+<p>Be sure to browse our <a href="kb/index.php">Frequently Asked Questions (FAQs)</a>, before contacting Motion RC.</p>
 </div>
 <?php
 } ?>
