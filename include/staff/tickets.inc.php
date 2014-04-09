@@ -196,6 +196,7 @@ $x=$sort.'_sort';
 $$x=' class="'.strtolower($order).'" ';
 
 if($_GET['limit'])
+    $qstr.='&limit='.urlencode($_GET['limit']);
 
 $qselect ='SELECT ticket.ticket_id,tlock.lock_id,ticket.`number`,ticket.dept_id,ticket.staff_id,ticket.team_id '
     .' ,user.name'
@@ -207,10 +208,10 @@ $qfrom=' FROM '.TICKET_TABLE.' ticket '.
        ' LEFT JOIN '.USER_EMAIL_TABLE.' email ON user.id = email.user_id'.
        ' LEFT JOIN '.DEPT_TABLE.' dept ON ticket.dept_id=dept.dept_id ';
 
-
 if ($_REQUEST['uid'])
     $qfrom.=' LEFT JOIN '.TICKET_COLLABORATOR_TABLE.' collab
         ON (ticket.ticket_id = collab.ticket_id )';
+
 
 $sjoin='';
 
