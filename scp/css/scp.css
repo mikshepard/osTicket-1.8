@@ -1634,6 +1634,24 @@ div.selected-signature .inner {
     right: 5px;
 }
 
+tr + tr .alert-config .header {
+    padding-top: 15px;
+}
+.alert-config .header {
+    padding: 7px 5px;
+    margin-bottom: 7px;
+    border-bottom: 1px solid #ccc;
+}
+.alert-config .switch {
+    display: inline-block;
+    width: 20%;
+    padding-left: 10px;
+    vertical-align: top;
+}
+.alert-config .options {
+    display: inline-block;
+}
+
 .sortable-row-item {
     border: 1px solid rgba(0, 0, 0, 0.7);
     padding: 9px;
