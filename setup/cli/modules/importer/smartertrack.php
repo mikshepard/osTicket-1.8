@@ -13,13 +13,13 @@ class SmarterTrackDumper extends DatabaseExporter {
         # Users
         $res = db_query(
             "SELECT `TicketID`, `CustomerEmailAddress`
-            FROM ".$this->remote_table('tickets')." ORDER BY DateOpenedUTC DESC LIMIT 8000"
+            FROM ".$this->remote_table('tickets')
         );
-        $users = array();
-        $user_emails = array();
+        $users = array('none@localhost'=>array('id'=>1, 'default_email_id'=>1, 'name'=>'Unknown'));
+        $user_emails = array(array('id'=>1, 'address'=>'none@localhost', 'user_id'=>1));
         $ticket_users = array();
-        $user_id = SerialNumber();
-        $email_id = SerialNumber();
+        $user_id = SerialNumber(2);
+        $email_id = SerialNumber(2);
 
         while (list($ticket, $address) = db_fetch_row($res)) {
             if (!($mails = Mail_RFC822::parseAddressList($address)) || PEAR::isError($mails))
@@ -93,10 +93,9 @@ class SmarterTrackDumper extends DatabaseExporter {
                 DateClosedUTC as `closed`,
                 CASE WHEN DateClosedUTC IS NULL THEN 'open' ELSE 'closed' END as `status`
             FROM ".$this->remote_table('tickets')."
-            WHERE NOT IsDeleted AND NOT IsSpam
-            ORDER BY DateOpenedUTC DESC",
+            WHERE NOT IsDeleted AND NOT IsSpam",
             function (&$rec) use ($ticket_users) {
-                $rec['user_id'] = $ticket_users[$rec['ticket_id']];
+                $rec['user_id'] = $ticket_users[$rec['ticket_id']] ?: 1;
             }
         );
         // TODO: Transfer subject and priority from the tickets
@@ -105,8 +104,7 @@ class SmarterTrackDumper extends DatabaseExporter {
                 TicketID as `object_id`,
                 'T' as `object_type`,
                 2 as `form_id`
-            FROM ".$this->remote_table('tickets')."
-            ORDER BY DateOpenedUTC DESC"
+            FROM ".$this->remote_table('tickets')
         );
 
         # Entries for the users
@@ -126,8 +124,7 @@ class SmarterTrackDumper extends DatabaseExporter {
             "SELECT TicketID as `entry_id`,
                 20 as `field_id`,
                 Subject as `value`
-            FROM ".$this->remote_table('tickets')."
-            ORDER BY DateOpenedUTC DESC"
+            FROM ".$this->remote_table('tickets')
         );
         $this->transfer('form_entry_values',
             "SELECT TicketID as `entry_id`,
@@ -136,8 +133,7 @@ class SmarterTrackDumper extends DatabaseExporter {
                 A1.TicketPriorityID as `value_id`
             FROM ".$this->remote_table('tickets')." A1
             JOIN ".$this->remote_table('ticketpriorities')." A2
-                ON (A1.TicketPriorityID = A2.TicketPriorityID)
-            ORDER BY A1.DateOpenedUTC DESC",
+                ON (A1.TicketPriorityID = A2.TicketPriorityID)",
             false,
             array('truncate'=>false)
         );
@@ -157,36 +153,57 @@ class SmarterTrackDumper extends DatabaseExporter {
         # Ticket thread
         $this->transfer('ticket_thread',
             "SELECT
-                TicketMessageId as `id`,
-                TicketID as `ticket_id`,
-                DateReceivedUTC as `created`,
-                UserID_From as `staff_id`,
-                Subject as `title`,
+                A1.TicketMessageId as `id`,
+                A1.TicketID as `ticket_id`,
+                A1.DateReceivedUTC as `created`,
+                A1.UserID_From as `staff_id`,
+                A1.Subject as `title`,
                 CASE WHEN BodyHtml <> '' THEN 'html' ELSE 'text' END as `format`,
                 CASE WHEN BodyHtml <> '' THEN BodyHtml ELSE BodyText END as `body`,
-                CASE WHEN MessageDirection = 0 THEN 'M' ELSE 'R' END as `thread_type`
-            FROM ".$this->remote_table('ticketmessages')."
-            ORDER BY DateReceivedUTC DESC",
-            function (&$rec) {
+                CASE WHEN MessageDirection = 0 THEN 'M' ELSE 'R' END as `thread_type`,
+                A1.FromAddress as `_poster`
+            FROM ".$this->remote_table('ticketmessages')." A1
+            JOIN ".$this->remote_table('tickets')." A3
+                ON (A1.TicketID = A3.TicketID)
+            WHERE NOT A3.IsDeleted AND NOT A3.IsSpam
+            ORDER BY A3.DateOpenedUTC DESC",
+            function (&$rec) use (&$seen) {
                 // TODO: Convert inline images
                 $rec['body'] = ($rec['format'] == 'html')
                     ? Format::safe_html($rec['body']) : Format::htmlchars($rec['body']);
                 unset($rec['format']);
-            }
+
+                // Determine the "poster" if possible
+                if ($rec['thread_type'] == 'M'
+                        && ($mails = Mail_RFC822::parseAddressList($rec['_poster']))
+                        && !PEAR::isError($mails)) {
+
+                    $mail = $mails[0];
+                    $rec['poster'] = str_replace('"', '', $mail->personal ?: $mail->mailbox ?: '');
+                }
+                else {
+                    $rec['poster'] = '';
+                }
+                unset($rec['_poster']);
+            },
+            array('truncate'=>false)
         );
         $this->transfer('ticket_thread',
             "SELECT
                 TicketCommentId as `id`,
-                TicketId as `ticket_id`,
-                DateEnteredUTC as `created`,
-                UserId as `staff_id`,
+                A1.TicketId as `ticket_id`,
+                A1.DateEnteredUTC as `created`,
+                A1.UserId as `staff_id`,
                 A2.EnglishName as `title`,
                 CommentText as `body`,
                 'N' as `thread_type`
             FROM ".$this->remote_table('ticketcomments')." A1
             JOIN ".$this->remote_table('commenttypes')." A2
                 ON (A1.CommentTypeID = A2.CommentTypeID)
-            ORDER BY DateEnteredUTC DESC",
+            JOIN ".$this->remote_table('tickets')." A3
+                ON (A1.TicketID = A3.TicketID)
+            WHERE NOT A3.IsDeleted AND NOT A3.IsSpam
+            ORDER BY A3.DateOpenedUTC DESC",
             function (&$rec) {
                 $rec['body'] = Format::htmlchars($rec['body']);
             },
