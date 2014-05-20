@@ -347,34 +347,6 @@ class SmarterTrackDumper extends DatabaseExporter {
         );
     }
 
-    function transfer($destination, $query, $callback=false, $options=array()) {
-        $header_out = false;
-        $res = db_query($query." LIMIT 8000", true, false);
-        $i = 0;
-        while ($row = db_fetch_array($res)) {
-            if (is_callable($callback))
-                $callback($row);
-            if (!$header_out) {
-                $fields = array_keys($row);
-                $this->write_block(
-                    array('table', $destination, $fields, $options));
-                $header_out = true;
-
-            }
-            $this->write_block(array_values($row));
-        }
-        $this->write_block(array('end-table'));
-    }
-
-    function transfer_array($destination, $array, $keys, $options=array()) {
-        $this->write_block(
-            array('table', $destination, $keys, $options));
-        foreach ($array as $row) {
-            $this->write_block(array_values($row));
-        }
-        $this->write_block(array('end-table'));
-    }
-
     function remote_table($name) {
         return $this->options['prefix'].$name;
     }
