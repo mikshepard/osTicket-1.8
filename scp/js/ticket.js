@@ -315,8 +315,11 @@ $.showImagesInline = function(urls, thread_id) {
 };
 
 $.refreshTicketView = function() {
-    if (0 === $('.dialog:visible').length)
+    if (0 === $('.dialog:visible').length) {
+        // Another timeout will be set on refresh
+        clearTimeout(window.ticket_refresh);
         $.pjax({url: document.location.href, container:'#pjax-container'});
+    }
 }
 
 var ticket_onload = function($) {
