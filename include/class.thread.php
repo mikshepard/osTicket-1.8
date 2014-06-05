@@ -1096,6 +1096,8 @@ Class ThreadEntry {
         // Inline images (attached to the draft)
         $entry->saveAttachments(Draft::getAttachmentIds($body));
 
+        Signal::send('model.created', $entry);
+
         return $entry;
     }
 
@@ -1358,12 +1360,11 @@ class ThreadBody /* extends SplString */ {
     }
 
     function display($format=false) {
-        throw new Exception('display: Abstract dispplay() method not implemented');
+        throw new Exception('display: Abstract display() method not implemented');
     }
 
     function getSearchable() {
-        return $this->body;
-        // TODO: Normalize Unicode string
+        return Format::searchable($this->body);
     }
 
     static function fromFormattedText($text, $format=false) {
@@ -1435,9 +1436,9 @@ class HtmlThreadBody extends ThreadBody {
 
     function getSearchable() {
         // <br> -> \n
-        $body = preg_replace('/\<br(\s*)?\/?\>/i', "\n", $this->body);
-        return Format::striptags($body);
-        // TODO: Normalize Unicode string
+        $body = preg_replace(array('`<br(\s*)?/?>`i', '`</div>`i'), "\n", $this->body);
+        $body = Format::htmldecode(Format::striptags($body));
+        return Format::searchable($body);
     }
 
     function display($output=false) {
