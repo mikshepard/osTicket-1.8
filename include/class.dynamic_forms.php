@@ -1179,6 +1179,8 @@ class SelectionField extends FormField {
             return null;
         if ($id && is_int($id))
             $item = DynamicListItem::lookup($id);
+        if ($value === null && $id === null)
+            return null;
         # Attempt item lookup by name too
         if (!$item || ($value !== null && $value != $item->get('value'))) {
             $item = DynamicListItem::lookup(array(
