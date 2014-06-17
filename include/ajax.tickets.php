@@ -101,6 +101,8 @@ class TicketsAjaxAPI extends AjaxController {
         global $thisstaff, $cfg, $ost;
 
         $result=array();
+        $criteria = array();
+
         $select = 'SELECT ticket.ticket_id';
         $from = ' FROM '.TICKET_TABLE.' ticket ';
         //Access control.
@@ -117,26 +119,34 @@ class TicketsAjaxAPI extends AjaxController {
         $where.=' ) ';
 
         //Department
-        if($req['deptId'])
+        if ($req['deptId']) {
             $where.=' AND ticket.dept_id='.db_input($req['deptId']);
+            $criteria['dept_id'] = $req['deptId'];
+        }
 
         //Help topic
-        if($req['topicId'])
+        if($req['topicId']) {
             $where.=' AND ticket.topic_id='.db_input($req['topicId']);
+            $criteria['topic_id'] = $req['topicId'];
+        }
 
         //Status
         switch(strtolower($req['status'])) {
             case 'open':
                 $where.=' AND ticket.status="open" ';
+                $criteria['status'] = 'open';
                 break;
             case 'answered':
                 $where.=' AND ticket.status="open" AND ticket.isanswered=1 ';
+                $criteria += array('status' => 'open', 'isanswered'=>1);
                 break;
             case 'overdue':
                 $where.=' AND ticket.status="open" AND ticket.isoverdue=1 ';
+                $criteria += array('status' => 'open', 'isoverdue'=>1);
                 break;
             case 'closed':
                 $where.=' AND ticket.status="closed" ';
+                $criteria['status'] = 'closed';
                 break;
         }
 
@@ -145,10 +155,14 @@ class TicketsAjaxAPI extends AjaxController {
             $id=preg_replace("/[^0-9]/", "", $req['assignee']);
             $assignee = $req['assignee'];
             $where.= ' AND ( ( ticket.status="open" ';
-            if($assignee[0]=='t')
+            if($assignee[0]=='t') {
                 $where.=' AND ticket.team_id='.db_input($id);
-            elseif($assignee[0]=='s')
+                $criteria['team_id'] = $id;
+            }
+            elseif($assignee[0]=='s') {
                 $where.=' AND ticket.staff_id='.db_input($id);
+                $criteria['staff_id'] = $id;
+            }
             elseif(is_numeric($id))
                 $where.=' AND ticket.staff_id='.db_input($id);
 
@@ -170,28 +184,22 @@ class TicketsAjaxAPI extends AjaxController {
         if( ($startTime && $startTime>time()) or ($startTime>$endTime && $endTime>0))
             $startTime=$endTime=0;
 
-        if($startTime)
+        if($startTime) {
             $where.=' AND ticket.created>=FROM_UNIXTIME('.$startTime.')';
+            $criteria['created__gte'] = $startTime;
+        }
 
-        if($endTime)
+        if($endTime) {
             $where.=' AND ticket.created<=FROM_UNIXTIME('.$endTime.')';
+            $criteria['created__lte'] = $startTime;
+        }
 
         //Query
         $joins = array();
         if($req['query']) {
-            $queryterm=db_real_escape($req['query'], false);
-
             // Setup sets of joins and queries
             if ($s = $ost->searcher)
-               $ids = $s->find($req['query'], null, 'Ticket');
-
-            if (!$ids)
-                return array();
-
-            $joins[] = array(
-                'from' => '',
-                'where' => 'ticket.ticket_id IN (' . implode(',', $ids) . ')'
-            );
+               return $s->find($req['query'], $criteria, 'Ticket');
         }
 
         // Dynamic fields
