@@ -194,14 +194,6 @@ class TicketsAjaxAPI extends AjaxController {
             $criteria['created__lte'] = $startTime;
         }
 
-        //Query
-        $joins = array();
-        if($req['query']) {
-            // Setup sets of joins and queries
-            if ($s = $ost->searcher)
-               return $s->find($req['query'], $criteria, 'Ticket');
-        }
-
         // Dynamic fields
         $cdata_search = false;
         foreach (TicketForm::getInstance()->getFields() as $f) {
@@ -209,10 +201,14 @@ class TicketsAjaxAPI extends AjaxController {
                     && ($val = $req[$f->getFormName()])) {
                 $name = $f->get('name') ? $f->get('name')
                     : 'field_'.$f->get('id');
-                if ($f->getImpl()->hasIdValue() && is_numeric($val))
+                if ($f->getImpl()->hasIdValue() && is_numeric($val)) {
                     $cwhere = "cdata.`{$name}_id` = ".db_input($val);
-                else
+                    $criteria["cdata.{$name}_id"] = $val;
+                }
+                else {
                     $cwhere = "cdata.`$name` LIKE '%".db_real_escape($val)."%'";
+                    $criteria["cdata.{$name}"] = $val;
+                }
                 $where .= ' AND ('.$cwhere.')';
                 $cdata_search = true;
             }
@@ -220,6 +216,14 @@ class TicketsAjaxAPI extends AjaxController {
         if ($cdata_search)
             $from .= 'LEFT JOIN '.TABLE_PREFIX.'ticket__cdata '
                     ." cdata ON (cdata.ticket_id = ticket.ticket_id)";
+
+        //Query
+        $joins = array();
+        if($req['query']) {
+            // Setup sets of joins and queries
+            if ($s = $ost->searcher)
+               return $s->find($req['query'], $criteria, 'Ticket');
+        }
 
         $sections = array();
         foreach ($joins as $j) {
