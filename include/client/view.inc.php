@@ -91,6 +91,16 @@ if ($thisclient && $thisclient->isGuest()
                    <th><?php echo __('Phone');?>:</th>
                    <td><?php echo $ticket->getPhoneNumber(); ?></td>
                </tr>
+			   <?php
+			   // Strobe Technologies Ltd | 17/04/2015 | START - Added Total Time Spent to ticket information
+			   // osTicket Version = v1.9.13
+			   if ($cfg->isClientTime()) { ?>
+			   <tr>
+					<th>Time Spent:</th>
+					<td><?php echo $ticket->getTimeSpent(); ?></td>
+				</tr>
+				<?PHP }
+				// Strobe Technologies Ltd | 17/04/2015 | START - Added Total Time Spent to ticket information ?>
             </table>
        </td>
     </tr>

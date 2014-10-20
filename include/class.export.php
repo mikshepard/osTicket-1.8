@@ -98,6 +98,12 @@ class Export {
                 'isanswered' =>     __('Answered'),
                 'staff::getName' => __('Agent Assigned'),
                 'team::getName' =>  __('Team Assigned'),
+				// Strobe Technologies Ltd | 12/06/2016 | START - Include time on export
+				// osTicket Version = v1.9.13
+				// Contributed by @ghaber
+				'time_spent' =>    __('Time'),
+				// Strobe Technologies Ltd | 12/06/2016 | END - Include time on export
+                'assigned' =>       __('Assigned To'),
                 'thread_count' =>   __('Thread Count'),
                 'attachment_count' => __('Attachment Count'),
             ) + $cdata,

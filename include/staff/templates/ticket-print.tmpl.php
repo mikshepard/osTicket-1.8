@@ -176,6 +176,10 @@ div.hr {
     <th><?php echo __('Last Message'); ?></th>
     <td><?php echo Format::datetime($ticket->getLastMessageDate()); ?></td>
 </tr>
+<tr>
+    <th><?php echo __('Time Spent'); ?></th>
+    <td><?php echo $ticket->getTimeSpent(); ?></td>
+</tr>
 </tbody>
 </table>
 

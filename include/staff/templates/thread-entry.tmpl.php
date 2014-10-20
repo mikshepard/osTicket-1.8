@@ -72,6 +72,16 @@ if ($user && $cfg->isAvatarsEnabled())
         <span style="max-width:400px" class="faded title truncate"><?php
             echo $entry->title; ?></span>
         </span>
+<?php
+            // Strobe Technologies Ltd | 11/08/2015 | START - If statement testing if thread has time assigned to it and display it
+            if ($cfg->isThreadTime()) {
+                if ($entry->time_spent > 0) { ?>
+                <span style="display:inline-block">
+                    <?php echo Ticket::formatTime($entry->time_spent) .' - '. Ticket::convTimeType($entry->time_type); ?>
+                </span>
+<?php           }
+            }
+            // Strobe Technologies Ltd | 11/08/2015 | END - If statement testing if thread has time assigned to it and display it ?>
     </div>
     <div class="thread-body no-pjax">
         <div><?php echo $entry->getBody()->toHtml(); ?></div>

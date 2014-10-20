@@ -30,6 +30,7 @@ $sort_options = array(
     'closed' =>             __('Most Recently Closed'),
     'hot' =>                __('Longest Thread'),
     'relevance' =>          __('Relevance'),
+    'time_spent' =>         __('Time Spent'),
 );
 
 // Queues columns
@@ -53,6 +54,11 @@ $queue_columns = array(
             'width' => '18.1%',
             'heading' => __('From'),
             'sort_col' =>  'user__name',
+            ),
+        'time' => array(
+            'width' => '4.2%',
+            'heading' => __('Time'),
+            'sort_col' => 'time_spent',
             ),
         'status' => array(
             'width' => '8.4%',
@@ -374,7 +380,7 @@ TicketForm::ensureDynamicDataView();
 // ------------------------------------------------------------
 $tickets->values('lock__staff_id', 'staff_id', 'isoverdue', 'team_id',
 'ticket_id', 'number', 'cdata__subject', 'user__default_email__address',
-'source', 'cdata__:priority__priority_color', 'cdata__:priority__priority_desc', 'status_id', 'status__name', 'status__state', 'dept_id', 'dept__name', 'user__name', 'lastupdate', 'isanswered', 'staff__firstname', 'staff__lastname', 'team__name');
+'source', 'cdata__:priority__priority_color', 'cdata__:priority__priority_desc', 'status_id', 'status__name', 'status__state', 'dept_id', 'dept__name', 'user__name', 'lastupdate', 'isanswered', 'staff__firstname', 'staff__lastname', 'team__name', 'time_spent');
 
 // Add in annotations
 $tickets->annotate(array(
@@ -578,6 +584,15 @@ return false;">
                     $un = new UsersName($T['user__name']);
                         echo Format::htmlchars($un);
                     ?></span></div></td>
+				<!--
+				Strobe Technologies Ltd | 14/10/2015 | START - Content Display
+				osTicket Version = v1.9.12
+				Contributed by @ghaber
+				-->
+				<td><?php echo $T['time_spent']; ?></td>
+				<!--
+				Strobe Technologies Ltd | 14/10/2015 | START - Content Display
+				-->
                 <?php
                 if($search && !$status){
                     $displaystatus=TicketStatus::getLocalById($T['status_id'], 'value', $T['status__name']);
@@ -602,7 +617,7 @@ return false;">
     </tbody>
     <tfoot>
      <tr>
-        <td colspan="7">
+        <td colspan="8">
             <?php if($total && $thisstaff->canManageTickets()){ ?>
             <?php echo __('Select');?>:&nbsp;
             <a id="selectAll" href="#ckb"><?php echo __('All');?></a>&nbsp;&nbsp;

@@ -158,6 +158,54 @@ class TicketModel extends VerySimpleModel {
         return $this->ticket_id;
     }
 
+	function getTimeSpent(){
+        return $this->formatTime($this->time_spent);
+    }
+	
+    function getRealTimeSpent() {
+        return $this->time_spent;
+    }
+	
+	function convTimeSpent($time) {
+		return $this->formatTime($time);
+	}
+	
+	function convTimeType($type) {
+        $typetext = DynamicListItem::lookup($type);
+		return $typetext->value;
+	}
+	
+	function formatTime($time) {
+		//New format to store in mins contributed by @joshbmarshall
+		$hours = floor($time / 60);
+		$minutes = $time % 60;
+		$formatted = '';
+
+		if ($hours > 0) {
+            $formatted .= _N('Hour', 'Hours', $hours);
+		}
+		if ($minutes > 0) {
+            if ($formatted) $formatted .= ', ';
+            $formatted .= _N('Minute', 'Minutes', $minutes);
+		}
+		return $formatted;
+	}
+	
+    function timeSpent($time){
+        if(empty($time)){
+			$time = 0;
+        }else{
+            if(!is_numeric($time)){
+				$time = 0;
+            }else{
+				$time = round($time,0);
+            }
+        }
+        $this->time_spent += $time;
+        return $this->save();
+    } 
+	// Strobe Technologies Ltd | 11/08/2015 | END - Variables and functions for recording and retrieving time spent
+
     function getEffectiveDate() {
          return Format::datetime(max(
              strtotime($this->thread->lastmessage),
