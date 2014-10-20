@@ -63,7 +63,61 @@ if($_POST && !$errors):
         //More coffee please.
         $errors=array();
         $lock=$ticket->getLock(); //Ticket lock if any
+		
         switch(strtolower($_POST['a'])):
+		// Strobe Technologies Ltd | 11/08/2015 | START - Add time case / switch
+		// osTicket Version = v1.9.13
+		case 'time':
+			if(!$_POST['time_spent'])
+				$errors['time_spent']=__('Time required');
+				
+			//Use locks to avoid double replies
+            if($lock && $lock->getStaffId()!=$thisstaff->getId())
+                $errors['err']=__('Action Denied. Ticket is locked by someone else!');
+			
+			//ghaber begins : Allow closing/opening ticket at the same time as adding time
+			// Functions to save open and close for adding time
+			// Contributed by @ghaber
+			$status=$ticket->getStatus(); 
+			$newstatus1=$_POST['add_time_status_id']; //Closed is 3 and open is 1, in numeric format
+			$newstatus2 = TicketStatus::lookup($newstatus1); // Transform status to 'open' or 'closed'
+			if($newstatus2 != $status) { //if they are different, then we make a status change
+				$ticket->setStatus($newstatus2);
+			}
+			//ghaber ends 
+			
+			//If no error...do the do.
+            $vars = $_POST;
+			
+			if(!$errors && ($response=$ticket->timeSpent($_POST['time_spent']))) {
+                $msg = sprintf(__('%s: Time posted successfully'),
+                        sprintf(__('Ticket #%s'),
+                            sprintf('<a href="tickets.php?id=%d"><b>%s</b></a>',
+                                $ticket->getId(), $ticket->getNumber()))
+                        );
+
+
+				if($_POST['time_spent']) {
+					$ticket->timeSpent($_POST['time_spent']);
+				}
+						
+                // Remove staff's locks
+                TicketLock::removeStaffLocks($thisstaff->getId(),
+                        $ticket->getId());
+
+                // Cleanup response draft for this user
+                Draft::deleteForNamespace(
+                    'ticket.response.' . $ticket->getId(),
+                    $thisstaff->getId());
+
+                // Go back to the ticket listing page on reply
+                $ticket = null;
+
+            } elseif(!$errors['err']) {
+                $errors['err']=__('Unable to post the time. Correct the errors below and try again!');
+            }
+			break;
+			// Strobe Technologies Ltd | 11/08/2015 | END - Add time case / switch
         case 'reply':
             if(!$thisstaff->canPostReply())
                 $errors['err'] = __('Action denied. Contact admin for access');
@@ -89,6 +143,13 @@ if($_POST && !$errors):
                                 $ticket->getId(), $ticket->getNumber()))
                         );
 
+				// Strobe Technologies Ltd | 11/08/2015 | START - Collect Total Spent from results
+				// osTicket Version = v1.9.13
+				if($_POST['time_spent']) {
+					$ticket->timeSpent($_POST['time_spent']);
+				}
+				// Strobe Technologies Ltd | 11/08/2015 | END - Collect Total Spent from results
+				
                 // Clear attachment list
                 $response_form->setSource(array());
                 $response_form->getField('attachments')->reset();
@@ -202,6 +263,13 @@ if($_POST && !$errors):
 
             $wasOpen = ($ticket->isOpen());
             if(($note=$ticket->postNote($vars, $errors, $thisstaff))) {
+			
+				// Strobe Technologies Ltd | 11/08/2015 | START - Collect Total Spent from results
+				// osTicket Version = v1.9.13
+				if($_POST['time_spent']) {
+					$ticket->timeSpent($_POST['time_spent']);
+				}
+				// Strobe Technologies Ltd | 11/08/2015 | END - Collect Total Spent from results
 
                 $msg=__('Internal note posted successfully');
                 // Clear attachment list
@@ -457,7 +525,7 @@ if($thisstaff->canCreateTickets()) {
 }
 
 
-$ost->addExtraHeader('<script type="text/javascript" src="js/ticket.js"></script>');
+$ost->addExtraHeader('<script type="text/javascript" src="js/ticket.js?c1b5a33"></script>');
 $ost->addExtraHeader('<meta name="tip-namespace" content="tickets.queue" />',
     "$('#content').data('tipNamespace', 'tickets.queue');");
 

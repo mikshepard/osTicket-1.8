@@ -53,6 +53,10 @@ class Ticket {
     var $tlock; //TicketLock obj
 
     var $thread; //Thread obj.
+	
+	// Strobe Technologies Ltd | 11/08/2015 | START - Variables and functions for recording and retrieving time spent
+	// osTicket Version = v1.9.13
+	var $timeSpent;
 
     // Ticket Sources
     static protected $sources =  array(
@@ -69,6 +73,66 @@ class Ticket {
             /* @trans */ 'Other',
             );
 
+	function getTimeSpent(){
+        return $this->formatTime($this->timeSpent);
+    }
+	
+    function getRealTimeSpent() {
+        return $this->timeSpent;
+    }
+	
+	function convTimeSpent($time) {
+		return $this->formatTime($time);
+	}
+	
+	function convTimeType($type) {
+		$sql = 'SELECT `value` FROM `ost_list_items` WHERE `id` = '. $type;
+		$res = db_query($sql);
+		
+		$typearray = db_fetch_array($res);
+
+        $typetext = $typearray['value'];
+		return $typetext;
+	}
+	
+	function formatTime($time) {
+		//New format to store in mins contributed by @joshbmarshall
+		$hours = floor($time / 60);
+		$minutes = $time % 60;
+
+		$formatted = '';
+
+		if ($hours > 0) {
+            $formatted .= $hours . ' Hour';
+            if ($hours > 1) {
+                    $formatted .= 's';
+            }
+		}
+		if ($minutes > 0) {
+            if ($formatted) $formatted .= ', ';
+            $formatted .= $minutes . ' Minute';
+            if ($minutes > 1) {
+                    $formatted .= 's';
+            }
+		}
+		return $formatted;
+	}
+	
+    function timeSpent($time){
+        if(empty($time)){
+			$time = 0;
+        }else{
+            if(!is_numeric($time)){
+				$time = 0;
+            }else{
+				$time = round($time,0);
+            }
+        }
+        $sql = 'UPDATE '.TICKET_TABLE.' SET time_spent='.db_input($this->getRealTimeSpent()).'+'.db_input($time).' WHERE ticket_id='.db_input($this->getId());
+        return (db_query($sql) && db_affected_rows())?true:false;
+    } 
+	// Strobe Technologies Ltd | 11/08/2015 | END - Variables and functions for recording and retrieving time spent
+
     function Ticket($id) {
         $this->id = 0;
         $this->load($id);
@@ -83,6 +147,7 @@ class Ticket {
             .' ,IF(sla.id IS NULL, NULL, '
                 .'DATE_ADD(ticket.created, INTERVAL sla.grace_period HOUR)) as sla_duedate '
             .' ,count(distinct attach.attach_id) as attachments'
+			.' ,time_spent'
             .' FROM '.TICKET_TABLE.' ticket '
             .' LEFT JOIN '.DEPT_TABLE.' dept ON (ticket.dept_id=dept.dept_id) '
             .' LEFT JOIN '.SLA_TABLE.' sla ON (ticket.sla_id=sla.id AND sla.isactive=1) '
@@ -92,6 +157,8 @@ class Ticket {
                 ON ( ticket.ticket_id=attach.ticket_id) '
             .' WHERE ticket.ticket_id='.db_input($id)
             .' GROUP BY ticket.ticket_id';
+			// Strobe Technologies Ltd | 11/08/2015 | Added time_spent to SQL select
+			// osTicket v1.9.13
 
         //echo $sql;
         if(!($res=db_query($sql)) || !db_num_rows($res))
@@ -102,6 +169,8 @@ class Ticket {
 
         $this->id       = $this->ht['ticket_id'];
         $this->number   = $this->ht['number'];
+		$this->timeSpent = $this->ht['time_spent'];		// Strobe Technologies Ltd | 11/08/2015 | Collecting time spent from SQL results
+														// osTicket Version = v1.9.13
         $this->_answers = array();
 
         $this->loadDynamicData();
