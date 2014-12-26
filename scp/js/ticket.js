@@ -286,7 +286,8 @@ $.showImagesInline = function(urls, thread_id) {
         : '.thread-body#thread-id-'+thread_id+' img[data-cid]';
     $(selector).each(function(i, el) {
         var e = $(el),
-            cid = e.data('cid').toLowerCase(),
+            cid = e.data('cid'),
+            urls = urls || e.closest('.thread-body').data('urls'),
             info = urls[cid];
         if (info && !e.data('wrapped')) {
             // Add a hover effect with the filename

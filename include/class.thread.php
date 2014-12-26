@@ -1242,6 +1242,9 @@ class HtmlThreadEntryBody extends ThreadEntryBody {
             $info['cid'] = 'img'.Misc::randCode(12);
             list(,$type) = explode('/', $info['type'], 2);
             $info['name'] = 'image'.Misc::randCode(4).'.'.$type;
+            // Commit the file to the storage API - NOTE: $info is received
+            // by reference and will add $key to the array
+            AttachmentFile::save($info);
             $self->embedded_images[] = $info;
             return 'src="cid:'.$info['cid'].'"';
         }, $body);
