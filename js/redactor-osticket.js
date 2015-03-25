@@ -255,8 +255,8 @@ $(function() {
                 'minHeight': selectedSize,
                 'focus': false,
                 'plugins': el.hasClass('no-bar')
-                  ? ['imagepaste','imagemanager','definedlinks']
-                  : ['imagepaste','imagemanager','imageannotate','table','video','definedlinks','autolock'],
+                  ? ['imagemanager','definedlinks']
+                  : ['imagemanager','imageannotate','table','video','definedlinks','autolock'],
                 'imageUpload': 'tbd',
                 'imageManagerJson': 'ajax.php/draft/images/browse',
                 'syncBeforeCallback': captureImageSizes,
@@ -291,6 +291,7 @@ $(function() {
         if (el.hasClass('draft')) {
             el.closest('form').append($('<input type="hidden" name="draft_id"/>'));
             options['plugins'].push('draft');
+            options['plugins'].push('imagepaste');
             options.draftDelete = el.hasClass('draft-delete');
         }
         if (el.hasClass('fullscreen'))

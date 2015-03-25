@@ -17,20 +17,13 @@
 .redactor-box {
   position: relative;
   overflow: visible;
-  background: #fff;
 }
-.redactor-box iframe,
 .redactor-box textarea {
   display: block;
   position: relative;
   margin: 0;
   padding: 0;
   width: 100%;
-}
-.redactor-box iframe {
-  border: 1px solid #eee;
-}
-.redactor-box textarea {
   overflow: auto;
   outline: none;
   border: none;
@@ -98,7 +91,7 @@ body .redactor-box-fullscreen {
 /*
 	Utils
 */
-.body-hidden {
+.body-redactor-hidden {
   overflow: hidden;
 }
 /*
@@ -112,13 +105,15 @@ body .redactor-box-fullscreen {
   outline: none;
   white-space: normal;
   border: 1px solid #eee;
-  border-top: none;
   font-family: Arial, Helvetica, Verdana, Tahoma, sans-serif;
   font-size: 14px;
   line-height: 1.6em;
 }
 .redactor-editor:focus {
   outline: none;
+}
+.toolbar-fixed-box + .redactor-editor {
+  padding-top: 32px !important;
 }
 /*
 	Placeholder
@@ -669,7 +664,7 @@ body .redactor-box-fullscreen {
   padding-left: 0;
   list-style: none;
   max-height: 250px;
-  overflow-x: scroll;
+  overflow-x: auto;
 }
 #redactor-modal #redactor-modal-list li {
   border-bottom: 1px solid #ddd;
@@ -840,9 +835,6 @@ body .redactor-box-fullscreen {
 .redactor-editor hr {
   margin-bottom: 15px;
 }
-.redactor-editor iframe {
-  width: auto;
-}
 .redactor-editor blockquote {
   margin-left: 1.6em !important;
   padding-left: 0;
@@ -940,10 +932,4 @@ body .redactor-box-fullscreen {
 .redactor-editor h6 {
   font-size: 12px;
   text-transform: uppercase;
-}
-.redactor-dropdown *,
-#redactor-modal * {
-  -webkit-box-sizing: border-box;
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
 }
