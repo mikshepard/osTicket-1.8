@@ -97,7 +97,15 @@ $users->order_by($order . $order_column);
             <li><a class="users-action" href="#delete">
                 <i class="icon-trash icon-fixed-width"></i>
                 <?php echo __('Delete'); ?></a></li>
-<?php } ?>
+<?php }
+if ($thisstaff->getRole()->hasPerm(User::PERM_EDIT)) { ?>
+            <li><a href="#orgs/lookup/form" onclick="javascript:
+$.dialog('ajax.php/orgs/lookup/form', 201);
+return false;">
+                <i class="icon-group icon-fixed-width"></i>
+                <?php echo __('Add to Organization'); ?></a></li>
+<?php }
+if ('disabled' != $cfg->getClientRegistrationMode()) { ?>
             <li><a class="users-action" href="#reset">
                 <i class="icon-envelope icon-fixed-width"></i>
                 <?php echo __('Send Password Reset Email'); ?></a></li>
@@ -111,7 +119,8 @@ $users->order_by($order . $order_column);
             <li><a class="users-action" href="#unlock">
                 <i class="icon-unlock icon-fixed-width"></i>
                 <?php echo __('Unlock'); ?></a></li>
-<?php } ?>
+<?php }
+} # end of registration-enabled? ?>
         </ul>
     </div>
 </div>
@@ -130,6 +139,7 @@ else
  <input type="hidden" name="do" value="mass_process" >
  <input type="hidden" id="action" name="a" value="" >
  <input type="hidden" id="selected-count" name="count" value="" >
+ <input type="hidden" id="org_id" name="org_id" value="" >
  <table class="list" border="0" cellspacing="1" cellpadding="0" width="940">
     <caption><?php echo $showing; ?></caption>
     <thead>
@@ -227,15 +237,14 @@ $(function() {
 
         return false;
     });
-    $(document).on('click', 'a.users-action', function(e) {
-        e.preventDefault();
+    var goBaby = function(action) {
         var ids = [],
             $form = $('form#users-list');
         $(':checkbox.mass:checked', $form).each(function() {
             ids.push($(this).val());
         });
         if (ids.length && confirm(__('You sure?'))) {
-            $form.find('#action').val($(this).attr('href').substr(1));
+            $form.find('#action').val(action);
             $.each(ids, function() { $form.append($('<input type="hidden" name="ids[]">').val(this)); });
             $form.find('#selected-count').val(ids.length);
             $form.submit();
@@ -244,7 +253,20 @@ $(function() {
             $.sysAlert(__('Oops'),
                 __('You need to select at least one item'));
         }
+    };
+    $(document).on('click', 'a.users-action', function(e) {
+        e.preventDefault();
+        goBaby($(this).attr('href').substr(1));
         return false;
+    });
+    $(document).on('dialog:close', function(e, json) {
+        $form = $('form#users-list');
+        try {
+            var json = $.parseJSON(json);
+            $form.find('#org_id').val(json.id);
+            goBaby('setorg');
+        }
+        catch (e) { console.log(e); }
     });
 });
 </script>

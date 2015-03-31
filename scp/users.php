@@ -124,6 +124,17 @@ if ($_POST) {
                     }
                     break;
 
+                case 'setorg':
+                    if (!$thisstaff->getRole()->hasPerm(User::PERM_EDIT))
+                        $errors['err']=__('Access denied. Contact admin if you believe this is in error');
+                    elseif (!($org = Organization::lookup($_POST['org_id'])))
+                        $errors['err'] = __('Unknown action - get technical help.');
+                    foreach ($users as $U) {
+                        if ($U->setOrganization($org))
+                            $count++;
+                    }
+                    break;
+
                 default:
                     $errors['err']=__('Unknown action - get technical help.');
                 }
