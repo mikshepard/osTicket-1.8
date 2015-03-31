@@ -38,7 +38,7 @@ class UserModel extends VerySimpleModel {
     static $meta = array(
         'table' => USER_TABLE,
         'pk' => array('id'),
-        'select_related' => array('default_email'),
+        'select_related' => array('default_email', 'account'),
         'joins' => array(
             'emails' => array(
                 'reverse' => 'UserEmailModel.user',
@@ -63,6 +63,13 @@ class UserModel extends VerySimpleModel {
             'cdata' => array(
                 'constraint' => array('id' => 'UserCdata.user_id'),
                 'null' => true,
+            ),
+            'cdata_entry' => array(
+                'constraint' => array(
+                    'id' => 'DynamicFormEntry.object_id',
+                    "'U'" => 'DynamicFormEntry.object_type',
+                ),
+                null => true,
             ),
         )
     );
@@ -884,6 +891,11 @@ class UserAccountModel extends VerySimpleModel {
 
     function lock() {
         $this->setStatus(UserAccountStatus::LOCKED);
+        $this->save();
+    }
+
+    function unlock() {
+        $this->clearStatus(UserAccountStatus::LOCKED);
         $this->save();
     }
 

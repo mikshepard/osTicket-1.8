@@ -269,6 +269,10 @@ $(function() {
               }
             });
         }
+        else if (!ids.length) {
+            $.sysAlert(__('Oops'),
+                __('You need to select at least one item'));
+        }
         return false;
     });
 });

@@ -12,7 +12,8 @@ if ($_REQUEST['query']) {
         'emails__address__contains' => $search,
         'name__contains' => $search,
         'org__name__contains' => $search,
-        // TODO: Add search for cdata
+        // Add search for cdata — TODO: Use search index
+        'cdata_entry__answers__value__contains' => $search,
     )));
     $qs += array('query' => $_REQUEST['query']);
 }
@@ -71,14 +72,51 @@ $users->order_by($order . $order_column);
         </table>
     </form>
  </div>
+
+<div class="pull-right">
+    <em style="display:inline-block; padding-bottom: 3px;"><?php echo $showing; ?></em>
 <?php if ($thisstaff->getRole()->hasPerm(User::PERM_CREATE)) { ?>
- <div class="pull-right flush-right" style="padding-right:5px;">
-    <b><a href="#users/add" class="Icon newstaff popup-dialog"><?php echo __('Add User'); ?></a></b>
-    |
-    <b><a href="#users/import" class="popup-dialog"><i class="icon-cloud-upload icon-large"></i>
-    <?php echo __('Import'); ?></a></b>
-</div>
+    <a class="action-button popup-dialog"
+        href="#users/add">
+        <i class="icon-plus-sign"></i>
+        <?php echo __('Add User'); ?>
+    </a>
+    <a class="action-button popup-dialog"
+        href="#users/import">
+        <i class="icon-upload"></i>
+        <?php echo __('Import'); ?>
+    </a>
 <?php } ?>
+    <span class="action-button" data-dropdown="#action-dropdown-more">
+        <i class="icon-caret-down pull-right"></i>
+        <span ><i class="icon-cog"></i> <?php echo __('More');?></span>
+    </span>
+    <div id="action-dropdown-more" class="action-dropdown anchor-right">
+        <ul>
+<?php if ($thisstaff->getRole()->hasPerm(User::PERM_DELETE)) { ?>
+            <li><a class="users-action" href="#delete">
+                <i class="icon-trash icon-fixed-width"></i>
+                <?php echo __('Delete'); ?></a></li>
+<?php } ?>
+            <li><a class="users-action" href="#reset">
+                <i class="icon-envelope icon-fixed-width"></i>
+                <?php echo __('Send Password Reset Email'); ?></a></li>
+<?php if ($thisstaff->getRole()->hasPerm(User::PERM_MANAGE)) { ?>
+            <li><a class="users-action" href="#register">
+                <i class="icon-star icon-fixed-width"></i>
+                <?php echo __('Register'); ?></a></li>
+            <li><a class="users-action" href="#lock">
+                <i class="icon-lock icon-fixed-width"></i>
+                <?php echo __('Lock'); ?></a></li>
+            <li><a class="users-action" href="#unlock">
+                <i class="icon-unlock icon-fixed-width"></i>
+                <?php echo __('Unlock'); ?></a></li>
+<?php } ?>
+        </ul>
+    </div>
+</div>
+
+
 <div class="clear"></div>
 <?php
 $showing = $search ? __('Search Results').': ' : '';
@@ -87,14 +125,16 @@ if($users->exists(true))
 else
     $showing .= __('No users found!');
 ?>
-<form action="users.php" method="POST" name="staff" >
+<form id="users-list" action="users.php" method="POST" name="staff" >
  <?php csrf_token(); ?>
  <input type="hidden" name="do" value="mass_process" >
  <input type="hidden" id="action" name="a" value="" >
+ <input type="hidden" id="selected-count" name="count" value="" >
  <table class="list" border="0" cellspacing="1" cellpadding="0" width="940">
     <caption><?php echo $showing; ?></caption>
     <thead>
         <tr>
+            <th nowrap width="12"> </th>
             <th width="350"><a <?php echo $name_sort; ?> href="users.php?<?php
                 echo $qstr; ?>&sort=name"><?php echo __('Name'); ?></a></th>
             <th width="250"><a  <?php echo $status_sort; ?> href="users.php?<?php
@@ -126,6 +166,9 @@ else
                     $sel=true;
                 ?>
                <tr id="<?php echo $U['id']; ?>">
+                <td nowrap>
+                    <input type="checkbox" value="<?php echo $U['id']; ?>" class="mass nowarn"/>
+                </td>
                 <td>&nbsp;
                     <a class="preview"
                         href="users.php?id=<?php echo $U['id']; ?>"
@@ -183,7 +226,26 @@ $(function() {
          });
 
         return false;
-     });
+    });
+    $(document).on('click', 'a.users-action', function(e) {
+        e.preventDefault();
+        var ids = [],
+            $form = $('form#users-list');
+        $(':checkbox.mass:checked', $form).each(function() {
+            ids.push($(this).val());
+        });
+        if (ids.length && confirm(__('You sure?'))) {
+            $form.find('#action').val($(this).attr('href').substr(1));
+            $.each(ids, function() { $form.append($('<input type="hidden" name="ids[]">').val(this)); });
+            $form.find('#selected-count').val(ids.length);
+            $form.submit();
+        }
+        else if (!ids.length) {
+            $.sysAlert(__('Oops'),
+                __('You need to select at least one item'));
+        }
+        return false;
+    });
 });
 </script>
 
