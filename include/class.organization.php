@@ -28,6 +28,12 @@ class OrganizationModel extends VerySimpleModel {
             'cdata' => array(
                 'constraint' => array('id' => 'OrganizationCdata.org_id'),
             ),
+            'cdata_entry' => array(
+                'constraint' => array(
+                    'id' => 'DynamicFormEntry.object_id',
+                    "'O'" => 'DynamicFormEntry.object_type',
+                ),
+            ),
         )
     );
 
