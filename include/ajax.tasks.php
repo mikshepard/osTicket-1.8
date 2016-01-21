@@ -86,7 +86,7 @@ class TasksAjaxAPI extends AjaxController {
                 $vars['staffId'] = $thisstaff->getId();
                 $vars['poster'] = $thisstaff;
                 $vars['ip_address'] = $_SERVER['REMOTE_ADDR'];
-                if (($task=Task::create($vars, $errors)))
+                if (($task=Task::createFromUi($vars, $errors)))
                     Http::response(201, $task->getId());
             }
 
@@ -190,7 +190,7 @@ class TasksAjaxAPI extends AjaxController {
             $form = AssignmentForm::instantiate($_POST);
 
             $assignCB = function($t, $f, $e) {
-                return $t->assign($f, $e);
+                return $t->assignViaForm($f, $e);
             };
 
             $assignees = null;
@@ -535,7 +535,7 @@ class TasksAjaxAPI extends AjaxController {
         }
 
         if ($_POST && $form->isValid()) {
-            if ($task->assign($form, $errors)) {
+            if ($task->assignViaForm($form, $errors)) {
                 $_SESSION['::sysmsgs']['msg'] = sprintf(
                         __('%s successfully'),
                         sprintf(
@@ -760,6 +760,49 @@ class TasksAjaxAPI extends AjaxController {
         }
 
         include STAFFINC_DIR . 'templates/task-view.tmpl.php';
+    }
+
+
+    // TASK TEMPLATE OPERATIONS --------------------------------------
+
+    function addTemplateGroup() {
+        global $thisstaff;
+
+        if (!$thisstaff || !$thisstaff->isAdmin())
+            Http::response(403, __('Permission Denied'));
+
+        $form = new TaskTemplateGroupForm($_POST);
+        if ($_POST && $form->isValid()) {
+            $set = TaskTemplateGroup::create($form->getClean(Form::FORMAT_PHP));
+            if ($set->save())
+                Http::response(201);
+        }
+
+        $info = array('action' => '#tasks/template/group/add');
+        include STAFFINC_DIR . 'templates/task-template-group.tmpl.php';
+    }
+
+    function editTemplateGroup($gid) {
+        global $thisstaff;
+
+        if (!$thisstaff || !$thisstaff->isAdmin())
+            Http::response(403, __('Permission Denied'));
+        elseif (!($set = TaskTemplateGroup::lookup($gid)))
+            Http::response(404, 'No such task template');
+
+        $form = new TaskTemplateGroupForm($_POST ?: $set->getDbFields());
+        if ($_POST && $form->isValid()) {
+            $data = $form->getClean(Form::FORMAT_PHP);
+            $set->name = $data['name'];
+            $set->notes = $data['notes'];
+            $set->dept_id = $data['dept_id'];
+            $set->topic_id = $data['topic_id'];
+            if ($set->save())
+                Http::response(201);
+        }
+
+        $info = array('action' => '#tasks/template/group/'.$gid);
+        include STAFFINC_DIR . 'templates/task-template-group.tmpl.php';
     }
 }
 ?>

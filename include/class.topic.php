@@ -57,6 +57,12 @@ implements TemplateVariable {
                 'reverse' => 'TopicFormModel.topic',
                 'null' => true,
             ),
+            'task_group' => array(
+                'constraint' => array(
+                    'task_group_id' => 'TaskTemplateGroup.id',
+                ),
+                'null' => true,
+            ),
         ),
     );
 
@@ -229,6 +235,10 @@ implements TemplateVariable {
 
         return $sequence->next($this->number_format ?: '######',
             array('Ticket', 'isTicketNumberUnique'));
+    }
+
+    function getTaskTemplateGroup() {
+        return $this->task_group;
     }
 
     function getTranslateTag($subtag) {
@@ -424,6 +434,7 @@ implements TemplateVariable {
         $this->number_format = $vars['custom-numbers'] ? $vars['number_format'] : '';
         $this->flags = $vars['custom-numbers'] ? self::FLAG_CUSTOM_NUMBERS : 0;
         $this->noautoresp = !!$vars['noautoresp'];
+        $this->task_group_id = $vars['task_group_id'] ?: 0;
         $this->notes = Format::sanitize($vars['notes']);
 
         //Auto assign ID is overloaded...

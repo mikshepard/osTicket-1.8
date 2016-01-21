@@ -489,6 +489,20 @@ class VerySimpleModel {
     }
 
     /**
+     * Fetch a keyed array of the fields defined for this model and their
+     * current values. This is different from the $ht property in that
+     * relationships with other models and instrumented lists and such are
+     * automatically omitted.
+     */
+    function getDbFields() {
+        $info = array();
+        foreach (static::getMeta('fields') as $f) {
+            $info[$f] = $this->ht[$f];
+        }
+        return $info;
+    }
+
+    /**
      * objects
      *
      * Retrieve a QuerySet for this model class which can be used to fetch
@@ -1169,7 +1183,7 @@ class QuerySet implements IteratorAggregate, ArrayAccess, Serializable, Countabl
      * If no such model or multiple models exist, an exception is thrown.
      */
     function one() {
-        $list = $this->all();
+        $list = $this->order_by(false)->all();
         if (count($list) == 0)
             throw new DoesNotExist();
         elseif (count($list) > 1)
@@ -1552,6 +1566,20 @@ implements IteratorAggregate, Countable, ArrayAccess {
         $this->asArray();
         array_reverse($this->cache);
         return $this;
+    }
+
+    function hash_by($attr) {
+        return $this->getKeyedList($attr);
+    }
+
+    // Fetch a keyed listing of the items in this list
+    function getKeyedList($key, $attr=false) {
+        $list = array();
+        foreach ($this as $item)
+            $list[$item->get($key)] = $attr ? $item->get($attr) : $item;
+        $copy = clone $this;
+        $copy->cache = $list;
+        return $copy;
     }
 }
 
