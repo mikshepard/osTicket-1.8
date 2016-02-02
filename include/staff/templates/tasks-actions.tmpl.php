@@ -46,18 +46,20 @@ if ($agent->hasPerm(Task::PERM_CLOSE, false)) {
         </div>
 <?php
     } else {
-
         $actions += array(
-                'reopen' => array(
-                    'icon' => 'icon-undo',
-                    'action' => __('Reopen')
-                ));
-
-        $actions += array(
-                'close' => array(
-                    'icon' => 'icon-ok-circle',
-                    'action' => __('Close')
-                ));
+            'reopen' => array(
+                'icon' => 'icon-undo',
+                'action' => __('Reopen'),
+            ),
+            'close' => array(
+                'icon' => 'icon-ok-circle',
+                'action' => __('Close'),
+            ),
+            'cancel' => array(
+                'icon' => 'icon-remove',
+                'action' => __('Cancel'),
+            ),
+        );
     }
 }
 
