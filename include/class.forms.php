@@ -2053,9 +2053,11 @@ class DatetimeField extends FormField {
             'ndaysago' => array('InlineformField', array(
                 'form' => array(
                     'until' => new TextboxField(array(
+                        'layout' => new GridFluidCell(8),
                         'configuration' => array('validator'=>'number', 'size'=>4))
                     ),
                     'text' => new FreeTextField(array(
+                        'layout' => new GridFluidCell(4),
                         'configuration' => array('content' => 'days'))
                     ),
                 ),
@@ -2063,9 +2065,11 @@ class DatetimeField extends FormField {
             'ndays' => array('InlineformField', array(
                 'form' => array(
                     'until' => new TextboxField(array(
+                        'layout' => new GridFluidCell(8),
                         'configuration' => array('validator'=>'number', 'size'=>4))
                     ),
                     'text' => new FreeTextField(array(
+                        'layout' => new GridFluidCell(4),
                         'configuration' => array('content' => 'days'))
                     ),
                 ),
@@ -4142,7 +4146,7 @@ class FreeTextWidget extends Widget {
             echo Format::viewableImages($config['content']); ?></div>
         </div>
         <?php
-        if (($attachments=$this->field->getFiles())) { ?>
+        if (($attachments=$this->field->getFiles()) && count($attachments)) { ?>
             <section class="freetext-files">
             <div class="title"><?php echo __('Related Resources'); ?></div>
             <?php foreach ($attachments as $attach) { ?>
