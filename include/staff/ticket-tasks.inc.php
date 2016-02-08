@@ -5,7 +5,7 @@ $role = $thisstaff->getRole($ticket->getDeptId());
 
 $tasks = Task::objects()
     ->select_related('dept', 'staff', 'team')
-    ->order_by('-created', 'set_id');
+    ->order_by('created', 'set_id', 'id');
 
 $tasks->filter(array(
             'object_id' => $ticket->getId(),
