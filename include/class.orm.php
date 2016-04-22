@@ -229,6 +229,15 @@ class ModelMeta implements ArrayAccess {
         return $this->fields;
     }
 
+    function getByPath($path) {
+        if (is_string($path))
+            $path = explode('__', $path);
+        $root = $this;
+        foreach ($path as $P)
+            $root = $root['joins'][$P];
+        return $root;
+    }
+
     /**
      * Create a new instance of the model, optionally hydrating it with the
      * given hash table. The constructor is not called, which leaves the
@@ -2246,9 +2255,21 @@ class SqlCompiler {
             // Handle relationship comparisons with model objects
             elseif ($value instanceof VerySimpleModel) {
                 $criteria = array();
-                foreach ($value->pk as $f=>$v) {
-                    $f = $field . '__' . $f;
-                    $criteria[$f] = $v;
+                // Avoid a join if possible. Use the local side of the
+                // relationship
+                if (count($value->pk) === 1) {
+                    $path = explode('__', $field);
+                    $relationship = array_pop($path);
+                    $lhs = $model::getMeta()->getByPath($path);
+                    $local = $lhs['joins'][$relationship]['local'];
+                    foreach ($value->pk as $f=>$v) {
+                        $criteria["{$field}__{$local}"] = $v;
+                    }
+                }
+                else {
+                    foreach ($value->pk as $f=>$v) {
+                        $criteria["{$field}__{$f}"] = $v;
+                    }
                 }
                 $filter[] = $this->compileQ(new Q($criteria), $model, $slot);
             }
