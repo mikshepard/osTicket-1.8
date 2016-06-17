@@ -2,55 +2,29 @@
 require('staff.inc.php');
 require_once(INCLUDE_DIR.'class.ticket.php');
 
-function formatTime($time) {
-	$hours = floor($time / 60);
-	$minutes = $time % 60;
-
-	$formatted = '';
-
-	if ($hours > 0) {
-		$formatted .= $hours . ' Hour';
-		if ($hours > 1) {
-			$formatted .= 's';
-		}
-	}
-	if ($minutes > 0) {
-		if ($formatted) $formatted .= ', ';
-			$formatted .= $minutes . ' Minute';
-		if ($minutes > 1) {
-			$formatted .= 's';
-		}
-	}
-	return $formatted;
+$time_types = array();
+foreach (DynamicList::lookup(['type' => 'time-type'])->getItems() as $I) {
+    $time_types[$I->id] = $I->getValue();
 }
 
-function convTimeType($typeid) {
-	$sql = 'SELECT `value` FROM `ost_list_items` WHERE `id` = '. $typeid;
-	$res = db_query($sql);
+function countTime(Ticket $ticket) {
+    global $time_types;
+
+    $totals = array();
+    foreach ($ticket->getTimeTotalsByType() as $typeid=>$total) {
+        $type_name = $time_types[$typeid];
+        $totals[$type_name] = $total;
+    }
 	
-	$typearray = db_fetch_array($res);
-
-	$typetext = $typearray['value'];
-	return $typetext;
+	return $totals;
 }
-
-function countTime($ticketid, $typeid) {
-	$sql = 'SELECT SUM(`time_spent`) AS `totaltime` FROM `ost_ticket_thread` WHERE `ticket_id` = '. $ticketid .' AND `time_type` = '. $typeid .' AND time_bill = 1';
-	$res = db_query($sql);
-	
-	$timearray = db_fetch_array($res);
-
-	$totaltime = $timearray['totaltime'];
-	return $totaltime;
-}
-
 
 $ticket = $user = null; //clean start.
 //LOCKDOWN...See if the id provided is actually valid and if the user has access.
 if($_REQUEST['id']) {
     if(!($ticket=Ticket::lookup($_REQUEST['id'])))
          $errors['err']=sprintf(__('%s: Unknown or invalid ID.'), __('ticket'));
-    elseif(!$ticket->checkStaffAccess($thisstaff)) {
+    elseif(!$thisstaff->canAccess($ticket)) {
         $errors['err']=__('Access denied. Contact admin if you believe this is in error');
         $ticket=null; //Clear ticket obj.
     }
@@ -66,27 +40,6 @@ if(!$errors) {
 	$TicketID = $_GET['id'];
 	$Subject = $ticket->getSubject();
 	$TicketNo = $ticket->getNumber();
-
-
-	// Determine ID value for time-type
-	$sql = 'SELECT * FROM `ost_list` WHERE `type` = "time-type"';
-	$res = db_query($sql);
-	$timelist = db_fetch_array($res);
-	$timelistid = $timelist['id'];
-
-
-	// Generate Array of times for summary
-	$sql = 'SELECT * FROM `ost_list_items` where `list_id` = ' . $timelistid;
-	$res = db_query($sql);
-	$loop = 0;
-	// Not Displaying bug
-	// Fix by DanoEasi
-	//while($row = db_fetch_array($res, MYSQL_ASSOC)) {
-	while($row = db_fetch_array($res, MYSQLI_ASSOC)) {
-		$loop++;
-		$time[$loop][0] = countTime($TicketID, $row['id']);
-		$time[$loop][1] = $row['id'];
-	}
 }
 
 require_once(STAFFINC_DIR.'header.inc.php');
@@ -99,19 +52,15 @@ if(!$errors) {
 	<h2>Ticket Information</h2>
 	<p><b>Ticket:</b> #<?php echo $TicketNo; ?> <br />
 		<b>Subject:</b> <?php echo $Subject; ?> <br />
-		<b>Generated:</b> <?php echo date("D M d, Y G:i a"); ?>
+		<b>Generated:</b> <?php echo Format::datetime(Misc::gmtime(), false); ?>
 	</p>
 	<p>&nbsp;</p>
 	
 	<h2>Time Summary</h2>
 	<p>
-		<?php
-		for ($x = 1; $x <= count($time); $x++) {
-			if ($time[$x][0] <> "" && $time[$x][0] > 0) {
-				echo formatTime($time[$x][0]) . " " . convTimeType($time[$x][1]) . "<br />";
-			}
-		} 
-		?>
+<?php   foreach (countTime($ticket) as $name=>$total) {
+            echo sprintf('%s %s<br/>', Ticket::formatTime($total), $name);
+		} ?>
 	</p>
 	<p>&nbsp;</p>
 	
@@ -124,28 +73,29 @@ if(!$errors) {
 			<th>Time Spent</th>
 			<th>Time Type</th>
 		</tr>
-		<?php
-			$sql = 'SELECT * FROM `ost_ticket_thread` WHERE `ticket_id` = ' . $TicketID . ' AND (`thread_type`="R" OR `thread_type`="N") AND time_bill = 1';
-			$res = db_query($sql);
-			// Not Displaying bug
-			// Fix by DanoEasi
-			//while($row = db_fetch_array($res, MYSQL_ASSOC)) {
-			while($row = db_fetch_array($res, MYSQLI_ASSOC)) {
-				if ($row['poster']<>"SYSTEM") {
-					echo '<tr>';
-						echo "<td>" . $row['created'] . "</td>";
-						if ($row['thread_type']=="R") {
-							echo "<td>Response to Customer</td>";
-						}
-						if ($row['thread_type']=="N") {
-							echo "<td>Internal Note</td>";
-						}
-						echo "<td>" . $row['poster'] . "</td>";
-						echo "<td>" . formatTime($row['time_spent']) . "</td>";
-						echo "<td>" . convTimeType($row['time_type']) . "</td>";
-					echo '</tr>';
-				}
-			}
+<?php   foreach ($ticket->getThread()->getEntries()
+            ->exclude([
+                'poster' => 'SYSTEM',
+                'time_spent' => 0,
+            ])
+            ->filter([
+                'time_bill' => 1,
+                'type__in' => ['R', 'N'],
+            ])
+        as $entry) {
+            echo '<tr>';
+                echo "<td>" . Format::datetime($entry->created) . "</td>";
+                if ($entry->type=="R") {
+                    echo "<td>Response to Customer</td>";
+                }
+                if ($entry->type=="N") {
+                    echo "<td>Internal Note</td>";
+                }
+                echo "<td>" . Format::htmlchars($entry->poster) . "</td>";
+                echo "<td>" . Ticket::formatTime($entry->time_spent) . "</td>";
+                echo "<td>" . $time_types[$entry->time_type] . "</td>";
+            echo '</tr>';
+        }
 		?>
 	</table>
 

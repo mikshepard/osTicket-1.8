@@ -84,7 +84,7 @@ if(!defined('OSTSCPINC') || !$thisstaff || !is_object($org)) die('Invalid path')
     class="icon-pushpin"></i>&nbsp;<?php echo __('Notes'); ?></a></li>
 	<!-- Strobe Technologies Ltd | 12/06/2016 | START - Billing Tab Menu -->
 	<!-- osTicket Version = v1.9.13 -->
-	<li><a id="billing_tab" href="#billing"><i
+	<li><a href="#billing"><i
     class="icon-pushpin"></i>&nbsp;<?php echo __('Billing'); ?></a></li>
 	<!-- Strobe Technologies Ltd | 12/06/2016 | END - Billing Tab Menu -->
 </ul>

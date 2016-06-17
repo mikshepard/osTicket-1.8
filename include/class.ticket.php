@@ -170,23 +170,23 @@ class TicketModel extends VerySimpleModel {
 		return $this->formatTime($time);
 	}
 	
-	function convTimeType($type) {
+	static function convTimeType($type) {
         $typetext = DynamicListItem::lookup($type);
 		return $typetext->value;
 	}
 	
-	function formatTime($time) {
+	static function formatTime($time) {
 		//New format to store in mins contributed by @joshbmarshall
 		$hours = floor($time / 60);
 		$minutes = $time % 60;
 		$formatted = '';
 
 		if ($hours > 0) {
-            $formatted .= _N('Hour', 'Hours', $hours);
+            $formatted .= sprintf('%d %s', $hours, _N('Hour', 'Hours', $hours));
 		}
 		if ($minutes > 0) {
             if ($formatted) $formatted .= ', ';
-            $formatted .= _N('Minute', 'Minutes', $minutes);
+            $formatted .= sprintf('%d %s', $minutes, _N('Minute', 'Minutes', $minutes));
 		}
 		return $formatted;
 	}
@@ -204,6 +204,24 @@ class TicketModel extends VerySimpleModel {
         $this->time_spent += $time;
         return $this->save();
     } 
+
+    function getTimeTotalsByType($billable=true, $typeid=false) {
+        $times = Ticket::objects()
+            ->filter(['ticket_id' => $this->getId()])
+            ->values('thread__entries__time_type')
+            ->annotate(['totaltime' => SqlAggregate::SUM('thread__entries__time_spent')]);
+
+        if ($typeid)
+            $times = $times->filter(['thread__entries__time_type' => $typeid]);
+        if ($billable)
+            $times = $times->filter(['thread__entries__time_bill' => 1]);
+
+        $totals = array();
+        foreach ($times as $T) {
+            $totals[$T['thread__entries__time_type']] = $T['totaltime'];
+        }
+        return $totals;
+    }
 	// Strobe Technologies Ltd | 11/08/2015 | END - Variables and functions for recording and retrieving time spent
 
     function getEffectiveDate() {
