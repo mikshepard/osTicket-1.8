@@ -214,6 +214,13 @@ class OsticketConfig extends Config {
         'ticket_lock' => 2, // Lock on activity
         'max_open_tickets' => 0,
         'files_req_auth' => 1,
+        'isclienttime' => 0,
+        'istickettime' => 0,
+        'isthreadtime' => 0,
+        'isthreadtimer' => 0,
+        'isthreadbill' => 0,
+        'isthreadbilldefault' => 0,
+        'istickethardware' => 0,
     );
 
     function __construct($section=null) {

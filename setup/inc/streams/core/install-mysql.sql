@@ -629,6 +629,9 @@ CREATE TABLE `%TABLE_PREFIX%thread_entry` (
   `user_id` int(11) unsigned not null default 0,
   `type` char(1) NOT NULL default '',
   `flags` int(11) unsigned NOT NULL default '0',
+  `time_spent`  INT( 11 ) UNSIGNED NOT NULL DEFAULT '0',
+  `time_type` INT( 11 ) UNSIGNED NOT NULL DEFAULT '0',
+  `time_bill` INT( 11 ) UNSIGNED NOT NULL DEFAULT '0',
   `poster` varchar(128) NOT NULL default '',
   `editor` int(10) unsigned NULL,
   `editor_type` char(1) NULL,
@@ -677,6 +680,7 @@ CREATE TABLE `%TABLE_PREFIX%ticket` (
   `source_extra` varchar(40) NULL default NULL,
   `isoverdue` tinyint(1) unsigned NOT NULL default '0',
   `isanswered` tinyint(1) unsigned NOT NULL default '0',
+  `time_spent`  INT( 11 ) UNSIGNED NOT NULL DEFAULT '0',
   `duedate` datetime default NULL,
   `est_duedate` datetime default NULL,
   `reopened` datetime default NULL,
@@ -695,6 +699,16 @@ CREATE TABLE `%TABLE_PREFIX%ticket` (
   KEY `duedate` (`duedate`),
   KEY `topic_id` (`topic_id`),
   KEY `sla_id` (`sla_id`)
+) DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `%TABLE_PREFIX%ticket_hardware` (
+  `id` bigint(20) unsigned NOT NULL auto_increment,
+  `ticket_id` int(11) default NULL,
+  `description` varchar(255) default NULL,
+  `qty` int(11) NOT NULL default '0',
+  `unit_cost` DECIMAL(15,2) NOT NULL default '0',
+  `total_cost` DECIMAL(15,2) NOT NULL default '0',
+  PRIMARY KEY  (`id`)
 ) DEFAULT CHARSET=utf8;
 
 DROP TABLE IF EXISTS `%TABLE_PREFIX%lock`;
