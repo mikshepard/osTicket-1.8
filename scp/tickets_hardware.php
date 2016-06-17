@@ -7,7 +7,7 @@ $ticket = $user = null; //clean start.
 if($_REQUEST['id']) {
     if(!($ticket=Ticket::lookup($_REQUEST['id'])))
          $errors['err']=sprintf(__('%s: Unknown or invalid ID.'), __('ticket'));
-    elseif(!$ticket->checkStaffAccess($thisstaff)) {
+    elseif(!$thisstaff->canAccess($ticket)) {
         $errors['err']=__('Access denied. Contact admin if you believe this is in error');
         $ticket=null; //Clear ticket obj.
     }
@@ -16,7 +16,7 @@ if($_REQUEST['id']) {
 //Navigation & Page Info
 $nav->setTabActive('tickets');
 $ost->setPageTitle(sprintf(__('Ticket #%s Hardware Management'),$ticket->getNumber()));
-
+$hwform = new TicketHardwareForm($_POST);
 
 if(!$errors) {
 	// Retrieve Ticket Information
@@ -24,17 +24,12 @@ if(!$errors) {
 	$Subject = $ticket->getSubject();
 	$TicketNo = $ticket->getNumber();
 	
-	if($_POST['ticket_id']) {
-		// Collect information from submit
-		$ticket_id = $_POST['ticket_id'];
-		$description = $_POST['description'];
-		$qty = $_POST['qty'];
-		$unit_cost = $_POST['unit_cost'];
-		$total_cost = $_POST['total_cost'];
-		
+	if($_POST['ticket_id'] && $hwform->isValid()) {
 		// Create and Run SQL Query
-		$sql  = "INSERT INTO ost_ticket_hardware (ticket_id,description,qty,unit_cost,total_cost) values(". $ticket_id .",'". $description ."',". $qty .",". $unit_cost .",". $total_cost .")";
-		$res = db_query($sql);
+        $hwform_data = $hwform->getClean();
+        $hardware = $ticket->hardware;
+        $hardware->add(new TicketHardware($hwform_data));
+        $hardware->saveAll();
 	}
 }
 
@@ -59,62 +54,30 @@ if(!$errors) {
 			<th>Unit Cost (Ex VAT / Taxes)</th>
 			<th>Total Cost (Ex VAT / Taxes)</th>
 		</tr>
-		<?php
-			$sql = 'SELECT * FROM `ost_ticket_hardware` WHERE `ticket_id` = ' . $TicketID;
-			$res = db_query($sql);
-			// Not Displaying bug
-			// Fix by DanoEasi
-			//while($row = db_fetch_array($res, MYSQL_ASSOC)) {
-			while($row = db_fetch_array($res, MYSQLI_ASSOC)) {
+<?php
+            foreach ($ticket->hardware as $H) {
 				echo '<tr>';
-					echo "<td>" . $row['description'] . "</td>";
-					echo "<td>" . $row['qty'] . "</td>";
-					echo "<td>" . $row['unit_cost'] . "</td>";
-					echo "<td>" . $row['total_cost'] . "</td>";
+					echo "<td>" . Format::htmlchars($H->description) . "</td>";
+					echo "<td>" . Format::htmlchars($H->qty) . "</td>";
+					echo "<td>" . Format::htmlchars($H->unit_cost) . "</td>";
+					echo "<td>" . Format::htmlchars($H->total_cost) . "</td>";
 				echo '</tr>';
 			}
 		?>
 	</table>
 	
-	<p>&nbsp;</p>
-	<h2>Add Hardware</h2>
+    <hr/>
 	<form action="tickets_hardware.php?id=<?php echo $TicketID; ?>" name="reply" method="post">
-		<?php csrf_token(); ?>
 		<input type="hidden" name="ticket_id" value="<?php echo $TicketID; ?>">
-		<table>
-			<tr>
-				<td>Hardware Description:</td>
-				<td>&nbsp;</td>
-				<td>
-					<textarea name="description" id="description" cols="50" rows="5"></textarea>
-				</td>
-			</tr>
-			<tr>
-				<td>Quantity:</td>
-				<td>&nbsp;</td>
-				<td>
-					<input type="number" name="qty" id="qty" maxlength="3" size="4" />
-				</td>
-			</tr>
-			<tr>
-				<td>Unit Cost (Ex VAT / Taxes):</td>
-				<td>&nbsp;</td>
-				<td>
-					<input type="text" name="unit_cost" id="unit_cost" maxlength="18" size="19" />
-				</td>
-			</tr>
-			<tr>
-				<td>Total Cost (Ex VAT / Taxes):</td>
-				<td>&nbsp;</td>
-				<td>
-					<input type="text" name="total_cost" id="total_cost" maxlength="18" size="19" />
-				</td>
-			</tr>
-		</table>
-		<input class="btn_sm" type="submit" value="<?php echo __('Add Hardware');?>">
-		<input class="btn_sm" type="reset" value="<?php echo __('Reset');?>">
+<?php
+        csrf_token();
+        echo $hwform->asTable();
+?>
+<p class="full-width centered">
+		<input class="button" type="reset" value="<?php echo __('Reset');?>">
+		<input class="button" type="submit" value="<?php echo __('Add Hardware');?>">
+</p>
 	</form>
-	<p>&nbsp;</p>
 	
 <?php
 } else {

@@ -2858,7 +2858,10 @@ small {
 /* Form layouts */
 table.grid.form {
   width: 100%;
-  table-layout: fixed;
+  table-layout: fixed; 
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
 }
 table.grid.form caption {
   font-size: 1.3em;
@@ -2868,6 +2871,10 @@ table.grid.form caption {
 }
 .grid.form .cell {
   vertical-align: top;
+}
+.grid.form .cell fieldset {
+  margin: none;
+  border: none;
 }
 .grid.form .field {
   padding: 5px;
