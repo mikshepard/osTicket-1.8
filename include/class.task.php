@@ -1443,8 +1443,9 @@ class Task extends TaskModel implements RestrictedAccess, Threadable {
     static function create($vars=false) {
         global $cfg;
 
-        $task = parent::create(($vars ?: array()) + array(
+        $task = new static(($vars ?: array()) + array(
             'flags' => self::ISPENDING | self::ISOPEN,
+            // XXX: This should be done in the ::save method
             'number' => $cfg->getNewTaskNumber(),
             'created' => new SqlFunction('NOW'),
             'updated' => new SqlFunction('NOW'),
@@ -1754,6 +1755,11 @@ class TaskTemplate extends VerySimpleModel {
     const FLAG_ENABLED  = 0x0001;
     const FLAG_DELETED  = 0x0002;
 
+    function __construct($vars=false) {
+        parent::__construct($vars);
+        $this->created = SqlFunction::NOW();
+    }
+
     function getId()    { return $this->id; }
     function getAttachedForms() { return $this->forms; }
 
@@ -1944,8 +1950,13 @@ class TaskTemplate extends VerySimpleModel {
             'ticket'    => function($T) { return $T->getTicket()->created; },
             'set'       => function($T) { return $T->set->created; },
             'related'   => function($T) use ($tpl_id) {
-                return ($tpl = $T->set->getTaskByTemplateId($tpl_id))
-                    ? $tpl->started : null;
+                try {
+                    $tpl = $T->set->getTaskByTemplateId($tpl_id);
+                    return $tpl->started;
+                }
+                catch (DoesNotExist $x) {
+                    return null;
+                }
             },
         );
         if (!isset($references[$reference]))
@@ -2218,12 +2229,6 @@ class TaskTemplate extends VerySimpleModel {
         return true;
     }
 
-    static function create($vars=false) {
-        $tpl = parent::create($vars);
-        $tpl->created = SqlFunction::NOW();
-        return $tpl;
-    }
-
     function save($refetch=false) {
         if ($this->dirty)
             $this->updated = SqlFunction::NOW();
@@ -2389,6 +2394,11 @@ class TaskTemplateGroup extends VerySimpleModel {
     const FLAG_ENABLED  = 0x0001;
     const FLAG_DELETED  = 0x0002;
 
+    function __construct($vars=false) {
+        parent::__construct($vars);
+        $this->created = SqlFunction::NOW();
+    }
+
     function getId()    { return $this->id; }
     function getName()  { return $this->name; }
 
@@ -2425,7 +2435,7 @@ class TaskTemplateGroup extends VerySimpleModel {
      * group and adds them to the set. The created TaskSet is returned.
      */
     function instanciate(Ticket $ticket, $vars=false) {
-        $set = TaskSet::create(($vars ?: array()) + array(
+        $set = new TaskSet(($vars ?: array()) + array(
             'template_group_id' => $this->id,
         ));
         $set->save();
@@ -2533,12 +2543,6 @@ class TaskTemplateGroup extends VerySimpleModel {
         ));
     }
 
-    static function create($vars=false) {
-        $inst = parent::create($vars);
-        $inst->created = SqlFunction::NOW();
-        return $inst;
-    }
-
     function save($refetch=false) {
         if ($refetch || $this->dirty) {
             $this->updated = SqlFunction::NOW();
@@ -2612,6 +2616,11 @@ class TaskSet extends VerySimpleModel {
     const FLAG_STARTED      = 0x0001;
     const FLAG_COMPLETED    = 0x0002;
 
+    function __construct($vars=false) {
+        parent::__construct($vars);
+        $this->created = SqlFunction::NOW();
+    }
+
     function getName() {
         return $this->group->getName();
     }
@@ -2677,12 +2686,6 @@ class TaskSet extends VerySimpleModel {
         }
         $this->setFlag(self::FLAG_STARTED);
         return $this->save();
-    }
-
-    static function create($vars=false) {
-        $set = parent::create($vars);
-        $set->created = SqlFunction::NOW();
-        return $set;
     }
 }
 Signal::connect('task.closed', array('TaskSet', 'onTaskClosed'));
