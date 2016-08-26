@@ -1746,6 +1746,9 @@ class TaskTemplate extends VerySimpleModel {
             'forms' => array(
                 'reverse' => 'TaskTemplateForm.template',
             ),
+            'instances' => array(
+                'reverse' => 'Task.template'
+            ),
         ),
         'select_related' => array('group'),
     );
