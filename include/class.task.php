@@ -2390,6 +2390,9 @@ class TaskTemplateGroup extends VerySimpleModel {
             'templates' => array(
                 'reverse' => 'TaskTemplate.group'
             ),
+            'instances' => array(
+                'reverse' => 'TaskSet.group'
+            ),
         ),
         'ordering' => array('name'),
     );
