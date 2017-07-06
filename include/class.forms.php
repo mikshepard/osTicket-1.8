@@ -2544,12 +2544,15 @@ class AssigneeField extends ChoiceField {
             $id = key($id);
         }
 
-        if ($id[0] == 's')
-            return Staff::lookup(substr($id, 1));
-        elseif ($id[0] == 't')
-            return Team::lookup(substr($id, 1));
+        if ($id) {
+            if ($id[0] == 's')
+                return Staff::lookup(substr($id, 1));
+            elseif ($id[0] == 't')
+                return Team::lookup(substr($id, 1));
 
-        return $id;
+            return $id;
+        }
+        return $value;
     }
 
 
