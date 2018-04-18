@@ -738,10 +738,6 @@ class VerySimpleModel {
         return $pk;
     }
 
-    function getDbFields() {
-        return $this->ht;
-    }
-
     /**
      * Create a new clone of this model. The primary key will be unset and the
      * object will be set as __new__. The __clone() magic method is reserved
@@ -1019,44 +1015,6 @@ class SqlExpr extends SqlFunction {
             }
         }
         return implode(' ', $O) . ($alias ? ' AS ' .  $compiler->quote($alias) : '');
-    }
-}
-
-class SqlExpression extends SqlFunction {
-    var $operator;
-    var $operands;
-
-    function toSql($compiler, $model=false, $alias=false) {
-        $O = array();
-        foreach ($this->args as $operand) {
-            $O[] = $this->input($operand, $compiler, $model);
-        }
-        return '('.implode(' '.$this->func.' ', $O)
-            . ($alias ? ' AS '.$compiler->quote($alias) : '')
-            . ')';
-    }
-
-    static function __callStatic($operator, $operands) {
-        switch ($operator) {
-            case 'minus':
-                $operator = '-'; break;
-            case 'plus':
-                $operator = '+'; break;
-            case 'times':
-                $operator = '*'; break;
-            case 'bitand':
-                $operator = '&'; break;
-            case 'bitor':
-                $operator = '|'; break;
-            default:
-                throw new InvalidArgumentException($operator.': Invalid operator specified');
-        }
-        return parent::__callStatic($operator, $operands);
-    }
-
-    function __call($operator, $operands) {
-        array_unshift($operands, $this);
-        return SqlExpression::__callStatic($operator, $operands);
     }
 }
 
@@ -3107,7 +3065,7 @@ class MySqlCompiler extends SqlCompiler {
             foreach ($queryset->values as $alias=>$v) {
                 list($f) = $this->getField($v, $model);
                 $unaliased = $f;
-                if ($f instanceof SqlExpression)
+                if ($f instanceof SqlExpression) {
                     $fields[$f->toSql($this, $model, $alias)] = true;
                     if ($f instanceof SqlAggregate) {
                         // Don't group_by aggregate expressions
