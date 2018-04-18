@@ -301,6 +301,13 @@ class TaskModel extends VerySimpleModel {
         if ($this->isPending())
             return false;
 
+        // Check that all task dependencies are closed
+        foreach ($this->getDependencies() as $dep) {
+            if (!$dep->isClosed())
+                return sprintf(__('%1$s has open dependencies and cannot be closed.'),
+                    __('This task'));
+        }
+
         $warning = null;
         if ($this->getMissingRequiredFields()) {
             $warning = sprintf(
