@@ -103,6 +103,10 @@ class Bootstrap {
         define('TICKET_PRIORITY_TABLE',$prefix.'ticket_priority');
 
         define('TASK_TABLE', $prefix.'task');
+        define('TASK_SET_TABLE', $prefix.'task_set');
+        define('TASK_TEMPLATE_TABLE', $prefix.'task_template');
+        define('TASK_TEMPLATE_FORM_TABLE', $prefix.'task_template_form');
+        define('TASK_TEMPLATE_GROUP_TABLE', $prefix.'task_template_group');
         define('TASK_CDATA_TABLE', $prefix.'task__cdata');
 
         define('PRIORITY_TABLE',TICKET_PRIORITY_TABLE);

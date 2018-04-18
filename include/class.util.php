@@ -177,3 +177,20 @@ implements ArrayAccess, Serializable {
         $this->storage = unserialize($what);
     }
 }
+
+
+trait HasFlagsOrm {
+    protected function hasFlag($flag) {
+        return ($this->get('flags') & $flag) !== 0;
+    }
+
+    protected function clearFlag($flag) {
+        return $this->set('flags', $this->get('flags') & ~$flag);
+    }
+
+    protected function setFlag($flag, $value=true) {
+        return $this->set('flags',
+            $value ? ($this->get('flags') | $flag)
+                   : ($this->get('flags') & ~$flag));
+    }
+}

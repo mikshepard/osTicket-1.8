@@ -545,6 +545,20 @@ class VerySimpleModel {
     }
 
     /**
+     * Fetch a keyed array of the fields defined for this model and their
+     * current values. This is different from the $ht property in that
+     * relationships with other models and instrumented lists and such are
+     * automatically omitted.
+     */
+    function getDbFields() {
+        $info = array();
+        foreach (static::getMeta()->getFieldNames() as $f) {
+            $info[$f] = $this->ht[$f];
+        }
+        return $info;
+    }
+
+    /**
      * objects
      *
      * Retrieve a QuerySet for this model class which can be used to fetch
@@ -851,7 +865,9 @@ trait WriteableAnnotatedModelTrait {
     }
 }
 
-class SqlFunction {
+class SqlExpression {
+    var $func;
+    var $args;
     var $alias;
 
     function __construct($name) {
@@ -860,7 +876,7 @@ class SqlFunction {
     }
 
     function input($what, $compiler, $model) {
-        if ($what instanceof SqlFunction)
+        if ($what instanceof SqlExpression)
             $A = $what->toSql($compiler, $model);
         elseif ($what instanceof Q)
             $A = $compiler->compileQ($what, $model);
@@ -870,12 +886,13 @@ class SqlFunction {
     }
 
     function toSql($compiler, $model=false, $alias=false) {
-        $args = array();
-        foreach ($this->args as $A) {
-            $args[] = $this->input($A, $compiler, $model);
+        $O = array();
+        $alias = $alias ? $this->getAlias($alias) : false;
+        foreach ($this->args as $operand) {
+            $O[] = $this->input($operand, $compiler, $model);
         }
-        return sprintf('%s(%s)%s', $this->func, implode(', ', $args),
-            $alias && $this->alias ? ' AS '.$compiler->quote($this->alias) : '');
+        return implode(' '.$this->func.' ', $O)
+            . ($alias ? ' AS '.$compiler->quote($alias) : '');
     }
 
     function getAlias() {
@@ -885,15 +902,60 @@ class SqlFunction {
         $this->alias = $alias;
     }
 
+    function __call($operator, $other) {
+        array_unshift($other, $this);
+        return SqlBinaryExpression::__callStatic($operator, $other);
+    }
+
+    // XXX: Deprecated. Use SqlBinaryExpression::xyz(...)
+    static function __callStatic($operator, $operands) {
+        return SqlBinaryExpression::__callStatic($operator, $operands);
+    }
+}
+
+class SqlBinaryExpression extends SqlExpression {
+    function __construct($operator) {
+        $this->args = array_slice(func_get_args(), 1);
+        switch ($operator) {
+            case 'minus':
+                $operator = '-'; break;
+            case 'plus':
+                $operator = '+'; break;
+            case 'times':
+                $operator = '*'; break;
+            case 'bitand':
+                $operator = '&'; break;
+            case 'bitor':
+                $operator = '|'; break;
+            default:
+                throw new InvalidArgumentException('Invalid operator specified');
+        }
+        $this->func = $operator;
+    }
+
+    static function __callStatic($operator, $operands) {
+        $I = new static($operator);
+        $I->args = $operands;
+        return $I;
+    }
+}
+
+class SqlFunction extends SqlExpression {
+
+    function toSql($compiler, $model=false, $alias=false) {
+        $args = array();
+        $alias = $alias ? $this->getAlias($alias) : false;
+        foreach ($this->args as $A) {
+            $args[] = $this->input($A, $compiler, $model);
+        }
+        return sprintf('%s(%s)%s', $this->func, implode(', ', $args),
+            $alias ? ' AS '.$compiler->quote($alias) : '');
+    }
+
     static function __callStatic($func, $args) {
         $I = new static($func);
         $I->args = $args;
         return $I;
-    }
-
-    function __call($operator, $other) {
-        array_unshift($other, $this);
-        return SqlExpression::__callStatic($operator, $other);
     }
 }
 
@@ -918,6 +980,7 @@ class SqlCase extends SqlFunction {
 
     function toSql($compiler, $model=false, $alias=false) {
         $cases = array();
+        $alias = $alias ? $this->getAlias($alias) : false;
         foreach ($this->cases as $A) {
             list($expr, $result) = $A;
             $expr = $this->input($expr, $compiler, $model);
@@ -929,7 +992,7 @@ class SqlCase extends SqlFunction {
             $cases[] = "ELSE {$else}";
         }
         return sprintf('CASE %s END%s', implode(' ', $cases),
-            $alias && $this->alias ? ' AS '.$compiler->quote($this->alias) : '');
+            $alias ? ' AS '.$compiler->quote($alias) : '');
     }
 }
 
@@ -1002,7 +1065,8 @@ class SqlInterval extends SqlFunction {
 
     function toSql($compiler, $model=false, $alias=false) {
         $A = $this->args[0];
-        if ($A instanceof SqlFunction)
+        $alias = $alias ? $this->getAlias($alias) : false;
+        if ($A instanceof SqlExpression)
             $A = $A->toSql($compiler, $model);
         else
             $A = $compiler->input($A);
@@ -1037,13 +1101,13 @@ class SqlField extends SqlExpression {
     }
 }
 
-class SqlCode extends SqlFunction {
+class SqlCode extends SqlExpression {
     function __construct($code) {
         $this->code = $code;
     }
 
     function toSql($compiler, $model=false, $alias=false) {
-        return $this->code.($alias ? ' AS '.$alias : '');
+        return $this->code.($alias ? ' AS '.$compiler->quote($alias) : '');
     }
 }
 
@@ -1076,7 +1140,7 @@ class SqlAggregate extends SqlFunction {
         // For DISTINCT, require a field specification — not a relationship
         // specification.
         $E = $this->expr;
-        if ($E instanceof SqlFunction) {
+        if ($E instanceof SqlExpression) {
             $field = $E->toSql($compiler, $model);
         }
         else {
@@ -1338,7 +1402,7 @@ class QuerySet implements IteratorAggregate, ArrayAccess, Serializable, Countabl
      * If no such model or multiple models exist, an exception is thrown.
      */
     function one() {
-        $list = $this->all();
+        $list = $this->order_by(false)->all();
         if (count($list) == 0)
             throw new DoesNotExist();
         elseif (count($list) > 1)
@@ -1746,6 +1810,44 @@ implements ArrayAccess {
     function reverse() {
         $this->asArray();
         return parent::reverse();
+    }
+
+    /**
+     * Convenience method to return a simple hashed array based on the
+     * values of a single attribute.
+     *
+     * Returns:
+     * An array, hashed by the values of the given attribute.
+     */
+    function hash_by($attr) {
+        return $this->getKeyedList($attr)->asArray();
+    }
+
+    /**
+     * Change the list to be a simple key=>value pair list using one
+     * property of the items in the list. One case might be to change the
+     * list to be keyed by the primary key of the records. Normally, the
+     * list is only indexed by the position of the rows within the list.
+     *
+     * Parameters:
+     * $key - field to use as the source for the keys of the new array
+     * $attr - (optional) if specified, a field to use to fetch the values
+     *      of the new array. If unspecified, the entire record will remain
+     *      the value.
+     *
+     * Returns:
+     * A new list of the same type as this one (a deriviative of
+     * CachedResultSet), with the items keyed as described.
+     */
+    function getKeyedList($key, $attr=false) {
+        $list = array();
+        foreach ($this as $item)
+            $list[$item->get($key)] = $attr !== false ? (
+                $item instanceof VerySimpleModel ? $item->get($attr) : $item[$attr]
+            ) : $item;
+        $copy = clone $this;
+        $copy->cache = $list;
+        return $copy;
     }
 }
 
@@ -2164,6 +2266,13 @@ extends ModelResultSet {
         // Set cache and disable fetching
         $this->reset();
         $this->storage = $cache;
+    }
+
+    function reset() {
+        $this->cache = array();
+        $this->eoi = false;
+        // Re-fetch the queryset
+        parent::__construct(new ModelInstanceManager($this->queryset));
     }
 
     // Save all changes made to any list items
@@ -2833,7 +2942,7 @@ class MySqlCompiler extends SqlCompiler {
             }, $q->sql);
             return "({$sql})";
         }
-        elseif ($what instanceof SqlFunction) {
+        elseif ($what instanceof SqlExpression) {
             return $what->toSql($this, $model);
         }
         elseif (!isset($what)) {
@@ -2919,7 +3028,7 @@ class MySqlCompiler extends SqlCompiler {
                 if (is_array($sort)) {
                     list($sort, $dir) = $sort;
                 }
-                if ($sort instanceof SqlFunction) {
+                if ($sort instanceof SqlExpression) {
                     $field = $sort->toSql($this, $model);
                 }
                 else {
@@ -2935,7 +3044,7 @@ class MySqlCompiler extends SqlCompiler {
                     else
                         list($field) = $this->getField($sort, $model);
                 }
-                if ($field instanceof SqlFunction)
+                if ($field instanceof SqlExpression)
                     $field = $field->toSql($this, $model);
                 // TODO: Throw exception if $field can be indentified as
                 //       invalid
@@ -2998,7 +3107,7 @@ class MySqlCompiler extends SqlCompiler {
             foreach ($queryset->values as $alias=>$v) {
                 list($f) = $this->getField($v, $model);
                 $unaliased = $f;
-                if ($f instanceof SqlFunction) {
+                if ($f instanceof SqlExpression)
                     $fields[$f->toSql($this, $model, $alias)] = true;
                     if ($f instanceof SqlAggregate) {
                         // Don't group_by aggregate expressions
@@ -3054,7 +3163,7 @@ class MySqlCompiler extends SqlCompiler {
         // Add in SELECT extras
         if (isset($queryset->extra['select'])) {
             foreach ($queryset->extra['select'] as $name=>$expr) {
-                if ($expr instanceof SqlFunction)
+                if ($expr instanceof SqlExpression)
                     $expr = $expr->toSql($this, false, $name);
                 else
                     $expr = sprintf('%s AS %s', $expr, $this->quote($name));

@@ -432,6 +432,7 @@ CREATE TABLE `%TABLE_PREFIX%help_topic` (
   `sla_id` int(10) unsigned NOT NULL default '0',
   `page_id` int(10) unsigned NOT NULL default '0',
   `sequence_id` int(10) unsigned NOT NULL DEFAULT '0',
+  `task_group_id` int(10) unsigned NOT NULL DEFAULT '0',
   `sort` int(10) unsigned NOT NULL default '0',
   `topic` varchar(32) NOT NULL default '',
   `number_format` varchar(32) DEFAULT NULL,
@@ -716,7 +717,7 @@ CREATE TABLE `%TABLE_PREFIX%thread_event` (
   `team_id` int(11) unsigned NOT NULL,
   `dept_id` int(11) unsigned NOT NULL,
   `topic_id` int(11) unsigned NOT NULL,
-  `state` enum('created','closed','reopened','assigned','transferred','overdue','edited','viewed','error','collab','resent') NOT NULL,
+  `state` enum('created','closed','reopened','assigned','transferred','overdue','edited','viewed','error','collab','resent','started','other') NOT NULL,
   `data` varchar(1024) DEFAULT NULL COMMENT 'Encoded differences',
   `username` varchar(128) NOT NULL default 'SYSTEM',
   `uid` int(11) unsigned DEFAULT NULL,
@@ -773,11 +774,14 @@ CREATE TABLE `%TABLE_PREFIX%thread_collaborator` (
   KEY `user_id` (`user_id`)
 ) DEFAULT CHARSET=utf8;
 
+-- Task subsystem
 DROP TABLE IF EXISTS `%TABLE_PREFIX%task`;
 CREATE TABLE `%TABLE_PREFIX%task` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `object_id` int(11) NOT NULL DEFAULT '0',
   `object_type` char(1) NOT NULL,
+  `template_id` int(11) unsigned DEFAULT NULL,
+  `set_id` int(11) unsigned DEFAULT NULL,
   `number` varchar(20) DEFAULT NULL,
   `dept_id` int(10) unsigned NOT NULL DEFAULT '0',
   `staff_id` int(10) unsigned NOT NULL DEFAULT '0',
@@ -785,6 +789,7 @@ CREATE TABLE `%TABLE_PREFIX%task` (
   `lock_id` int(11) unsigned NOT NULL DEFAULT '0',
   `flags` int(10) unsigned NOT NULL DEFAULT '0',
   `duedate` datetime DEFAULT NULL,
+  `started` datetime DEFAULT NULL,
   `closed` datetime DEFAULT NULL,
   `created` datetime NOT NULL,
   `updated` datetime NOT NULL,
@@ -793,7 +798,63 @@ CREATE TABLE `%TABLE_PREFIX%task` (
   KEY `staff_id` (`staff_id`),
   KEY `team_id` (`team_id`),
   KEY `created` (`created`),
-  KEY `object` (`object_id`,`object_type`)
+  KEY `object` (`object_id`,`object_type`),
+  KEY `set_id` (`set_id`)
+) DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `%TABLE_PREFIX%task_set`;
+CREATE TABLE `%TABLE_PREFIX%task_set` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `template_group_id` int(10) unsigned NOT NULL,
+  `flags` int(10) unsigned NOT NULL DEFAULT '0',
+  `depends` int(10) unsigned NOT NULL DEFAULT '0',
+  `sort` int(10) unsigned NOT NULL DEFAULT '0',
+  `created` datetime NOT NULL,
+  `completed` datetime NULL,
+  PRIMARY KEY (`id`),
+  KEY `depends` (`depends`)
+) DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `%TABLE_PREFIX%task_template`;
+CREATE TABLE `%TABLE_PREFIX%task_template` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `group_id` int(10) unsigned NOT NULL,
+  `flags` int(10) unsigned NOT NULL DEFAULT '0',
+  `dept_id` int(10) unsigned NOT NULL DEFAULT '0',
+  `staff_id` int(10) unsigned NOT NULL DEFAULT '0',
+  `team_id` int(10) unsigned NOT NULL DEFAULT '0',
+  `duedate` varchar(20) collate ascii_bin DEFAULT NULL COMMENT 'eg. `ticket+2d`',
+  `depends` text collate ascii_bin NULL,
+  `data` TEXT NULL COMMENT 'Data for task form',
+  `sort` int(10) unsigned NOT NULL DEFAULT '0',
+  `notes` text DEFAULT NULL,
+  `created` datetime NOT NULL,
+  `updated` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `group_id` (`group_id`)
+) DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `%TABLE_PREFIX%task_template_form`;
+CREATE TABLE `%TABLE_PREFIX%task_template_form` (
+  `template_id` int(10) unsigned NOT NULL,
+  `form_id` int(10) unsigned NOT NULL,
+  `sort` int(10) unsigned DEFAULT NULL,
+  `data` text,
+  `extra` text,
+  PRIMARY KEY (`template_id`,`form_id`)
+) DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `%TABLE_PREFIX%task_template_group`;
+CREATE TABLE `%TABLE_PREFIX%task_template_group` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) DEFAULT NULL,
+  `flags` int(10) unsigned NOT NULL DEFAULT '0',
+  `topic_id` int(10) unsigned NOT NULL DEFAULT '0',
+  `dept_id` int(10) unsigned NOT NULL DEFAULT '0',
+  `notes` text DEFAULT NULL,
+  `created` datetime NOT NULL,
+  `updated` datetime NOT NULL,
+  PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8;
 
 -- pages

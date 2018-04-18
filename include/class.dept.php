@@ -782,8 +782,8 @@ extends Form {
         );
     }
 
-    function getClean() {
-        $clean = parent::getClean();
+    function getClean($format=self::FORMAT_DEFAULT) {
+        $clean = parent::getClean($format);
 
         $clean['ispublic'] = !$clean['private'];
         unset($clean['private']);
