@@ -1458,7 +1458,7 @@ implements RestrictedAccess, Threadable, Searchable {
         // reopen closed tickets on auto-reply from end user. This is not to
         // confused with autorespond on new message setting
         if ($reopen && $this->isClosed() && $this->isReopenable()) {
-            $this->reopen();
+            //$this->reopen();
             // Auto-assign to closing staff or the last respondent if the
             // agent is available and has access. Otherwise, put the ticket back
             // to unassigned pool.
